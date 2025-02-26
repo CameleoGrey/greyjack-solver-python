@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["greyjack"]
+
+[project]
+name = "greyjack"
+version = "0.0.1"
+dependencies = [
+  "numpy",
+]
+requires-python = ">=3.11"
+authors = [
+  {name = "Egor Chnegov (CameleoGrey)", email = "cameleogrey@yandex.ru"},
+]
+maintainers = [
+  {name = "Egor Chnegov (CameleoGrey)", email = "cameleogrey@yandex.ru"},
+]
+description = "GreyJack Solver is an AI constraint solver for Python (current version) built on top of Polars. It empowers you to solve a wide range of constraint optimization problems, including continuous, integer, and mixed-integer challenges."
+readme = "README.md"
+license = { file = "LICENSE" }
+keywords = ["greyjack", "solver", "optimization", "polars", "metaheuristic", "genetic algorithm"]
+classifiers = [
+	'Intended Audience :: Science/Research',
+    'Intended Audience :: Developers',
+	"License :: OSI Approved :: MIT License",
+    'Programming Language :: Python',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13',
+    'Programming Language :: Python :: 3 :: Only',
+    'Programming Language :: Python :: Implementation :: CPython',
+    'Topic :: Software Development',
+    'Topic :: Scientific/Engineering',
+    'Operating System :: Microsoft :: Windows',
+    'Operating System :: POSIX',
+    'Operating System :: Unix',
+    'Operating System :: MacOS',
+]
+
+[project.urls]
+Homepage = "https://github.com/CameleoGrey/greyjack-solver-python"
+Documentation = "https://github.com/CameleoGrey/greyjack-solver-python"
+Repository = "https://github.com/CameleoGrey/greyjack-solver-python.git"
+Issues = "https://github.com/CameleoGrey/greyjack-solver-python/issues"
