@@ -1,17 +1,17 @@
 [build-system]
-requires = ["setuptools >= 61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["maturin>=1.8,<2.0"]
+build-backend = "maturin"
 
-[tool.setuptools]
-py-modules = ["greyjack"]
+[tool.maturin]
+features = ["pyo3/extension-module"]
 
 [project]
 name = "greyjack"
-version = "0.0.1"
+version = "0.0.3"
+requires-python = ">=3.9"
 dependencies = [
   "numpy",
 ]
-requires-python = ">=3.11"
 authors = [
   {name = "Egor Chnegov (CameleoGrey)", email = "cameleogrey@yandex.ru"},
 ]
@@ -28,6 +28,8 @@ classifiers = [
 	"License :: OSI Approved :: MIT License",
     'Programming Language :: Python',
     'Programming Language :: Python :: 3',
+	'Programming Language :: Python :: 3.9',
+	'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
     'Programming Language :: Python :: 3.13',
@@ -36,9 +38,7 @@ classifiers = [
     'Topic :: Software Development',
     'Topic :: Scientific/Engineering',
     'Operating System :: Microsoft :: Windows',
-    'Operating System :: POSIX',
     'Operating System :: Unix',
-    'Operating System :: MacOS',
 ]
 
 [project.urls]
