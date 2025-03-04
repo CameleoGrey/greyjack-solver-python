@@ -25,7 +25,7 @@ class PlainScoreCalculator():
         for constraint_name in self.constraints.keys():
             scores_dict[constraint_name] = self.constraints[constraint_name](planning_entity_dfs, problem_fact_dfs)
             if constraint_name not in self.constraint_weights:
-                self.constraint_weights[constraint_name] = 1
+                self.constraint_weights[constraint_name] = 1.0
 
         scores_values = list(scores_dict.values())
         score_type = type(scores_values[0][0])
