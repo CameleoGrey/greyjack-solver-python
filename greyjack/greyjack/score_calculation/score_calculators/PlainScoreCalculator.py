@@ -1,5 +1,6 @@
 
 
+from greyjack.score_calculation.scores.HardMediumSoftScore import HardMediumSoftScore
 from greyjack.score_calculation.scores.HardSoftScore import HardSoftScore
 from greyjack.score_calculation.scores.SimpleScore import SimpleScore
 
@@ -38,12 +39,7 @@ class PlainScoreCalculator():
             sum_score = score_type()
             for score_name in scores_dict.keys():
                 current_score = scores_dict[score_name][0]
-                if isinstance(sum_score, SimpleScore):
-                    current_score.score_value = self.constraint_weights[score_name] * current_score.score_value
-                elif isinstance(sum_score, HardSoftScore):
-                    current_score.hard_score_value = self.constraint_weights[score_name] * current_score.hard_score
-                else:
-                    raise Exception("Not correct score type")
+                current_score = self.constraint_weights[score_name] * current_score
                 sum_score += current_score
 
         return sum_score

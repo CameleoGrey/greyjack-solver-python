@@ -5,7 +5,6 @@ class CotwinBase():
         self.planning_entities = {}
         self.problem_facts = {}
         self.score_calculators = {}
-        self.solved = False
         pass
 
     def _set_solution_status(self, status):
@@ -23,7 +22,7 @@ class CotwinBase():
         self.score_calculators[name] = score_calculator
         pass
 
-    def get_batch_score(self, planning_entity_dfs, problem_fact_dfs):
+    def get_score(self, planning_entity_dfs, problem_fact_dfs):
 
             scores_dict = {}
             for score_calculator_name in self.score_calculators.keys():
