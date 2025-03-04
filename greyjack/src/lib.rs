@@ -1,6 +1,6 @@
-use pyo3::{prelude::*, wrap_pymodule, py_run};
-use variables::GJPlanningVariable;
 
+
+use pyo3::{prelude::*, wrap_pymodule, py_run};
 mod score_calculation;
 mod variables;
 mod utils;
@@ -11,9 +11,7 @@ mod utils;
 fn greyjack(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
 
     // greyjack.variables
-    m.add_class::<variables::GJPlanningVariable>()?;
-    m.add_class::<variables::GJFloat>()?;
-    m.add_class::<variables::GJInteger>()?;
+    m.add_class::<variables::GJPlanningVariablePy>()?;
 
     // greyjack.scores
     m.add_class::<score_calculation::scores::SimpleScore>()?;

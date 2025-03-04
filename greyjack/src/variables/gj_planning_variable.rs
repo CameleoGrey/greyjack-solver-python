@@ -1,12 +1,10 @@
 
-use pyo3::prelude::*;
 use std::cmp::Ordering::*;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 use rand_distr::{Normal, Distribution, Uniform};
 use crate::utils::math_utils::rint;
 
-#[pyclass(subclass)]
 #[derive(Clone, Debug)]
 pub struct GJPlanningVariable {
     pub name: String,
@@ -21,11 +19,8 @@ pub struct GJPlanningVariable {
     pub is_int: bool,
 }
 
-#[pymethods]
 impl GJPlanningVariable {
-    #[new]
-    #[pyo3(signature = (name, lower_bound, upper_bound, frozen, is_int, initial_value=None, semantic_groups=None))]
-    pub fn new(name: String, lower_bound: f64, upper_bound: f64, frozen: bool, is_int: bool, initial_value: Option<f64>, semantic_groups: Option<Vec<String>>)  -> PyResult<Self> {
+    pub fn new(name: String, lower_bound: f64, upper_bound: f64, frozen: bool, is_int: bool, initial_value: Option<f64>, semantic_groups: Option<Vec<String>>)  -> Self {
             
             let normal_distribution;
             match initial_value {
@@ -43,7 +38,7 @@ impl GJPlanningVariable {
                 },
             }
 
-            Ok(GJPlanningVariable {
+            Self {
                 name: name.to_string(),
                 initial_value: initial_value,
                 lower_bound: lower_bound,
@@ -54,7 +49,7 @@ impl GJPlanningVariable {
                 normal_distribution: normal_distribution,
                 semantic_groups: current_semantic_groups,
                 is_int: is_int,
-            })
+            }
         }
 
     pub fn set_name(&mut self, new_name: String) {
@@ -123,7 +118,6 @@ impl GJPlanningVariable {
         }
     }
 
-    #[staticmethod]
     pub fn min(a: f64, b: f64) -> f64 {
 
         let min_value;
@@ -135,7 +129,6 @@ impl GJPlanningVariable {
         min_value
     }
 
-    #[staticmethod]
     pub fn max(a: f64, b: f64) -> f64 {
 
         let max_value;

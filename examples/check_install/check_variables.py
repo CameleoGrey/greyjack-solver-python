@@ -1,8 +1,8 @@
 
 
 #from greyjack.greyjack import GJPlanningVariable
-from greyjack.greyjack import GJPlanningVariable
-from greyjack.variables import GJFloat, GJInteger
+"""from greyjack.greyjack import GJPlanningVariable
+from greyjack.variables import GJFloat, GJInteger, GJBinary
 from greyjack.score_requesters.OOPScoreRequester import OOPScoreRequester
 
 #TODO: write normal unit-tests
@@ -14,10 +14,10 @@ if __name__ == "__main__":
     float_variable = GJFloat(name="x", lower_bound=10.0, upper_bound=100.0, frozen=False, initial_value=None, semantic_groups=None)
     print(float_variable.fix(1))
 
-    float_variable = GJInteger(name="x", lower_bound=100.0, upper_bound=1000.0, frozen=False, initial_value=None, semantic_groups=None)
+    int_variable = GJInteger(name="x", lower_bound=100.0, upper_bound=1000.0, frozen=False, initial_value=None, semantic_groups=None)
     print(float_variable.fix(10))
 
     print(OOPScoreRequester())
 
-    print("done")
+    print("done")"""
     
