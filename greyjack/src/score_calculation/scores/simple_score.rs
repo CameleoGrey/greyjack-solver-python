@@ -63,6 +63,21 @@ impl SimpleScore {
     fn round(&mut self, precision: Vec<u64>) {
         self.simple_value = round(self.simple_value, precision[0]);
     }
+
+    fn __add__(&self, rhs: &Self) -> Self {
+        Self {
+            simple_value: self.simple_value + rhs.simple_value,
+        }
+    }
+    
+    fn __repr__(&self) -> String {
+        return self.simple_value.to_string();
+    }
+
+    fn as_list(&self) -> Vec<f64> {
+        vec![self.simple_value]
+    }
+
 }
 
 impl Eq for SimpleScore {}

@@ -14,12 +14,13 @@ class NQueensScoreCalculator(PlainScoreCalculator):
 
         super().__init__()
 
+        self.score_type = "SimpleScore"
 
-        #self.constraints["different_rows"] = self.different_rows
-        #self.constraints["different_descending_diagonals"] = self.different_descending_diagonals
-        #self.constraints["different_ascending_diagonals"] = self.different_ascending_diagonals
+        #self.add_constraint("different_rows", self.different_rows)
+        #self.add_constraint("different_descending_diagonals", self.different_descending_diagonals)
+        #self.add_constraint("different_ascending_diagonals", self.different_ascending_diagonals)
 
-        self.constraints["all_different"] = self.all_different
+        self.add_constraint("all_different", self.all_different)
 
         pass
     

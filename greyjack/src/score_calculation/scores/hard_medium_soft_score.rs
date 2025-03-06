@@ -86,6 +86,22 @@ impl HardMediumSoftScore {
         self.medium_score = round(self.medium_score, precision[1]);
         self.soft_score = round(self.soft_score, precision[2]);
     }
+
+    fn __add__(&self, rhs: &Self) -> Self {
+        Self {
+            hard_score: self.hard_score + rhs.hard_score,
+            medium_score: self.medium_score + rhs.medium_score,
+            soft_score: self.soft_score + rhs.soft_score,
+        }
+    }
+    
+    fn __repr__(&self) -> String {
+        return self.hard_score.to_string() + " | " + &self.medium_score.to_string() + " | " + &self.soft_score.to_string();
+    }
+
+    fn as_list(&self) -> Vec<f64> {
+        vec![self.hard_score, self.medium_score, self.soft_score]
+    }
 }
 
 impl Eq for HardMediumSoftScore {}

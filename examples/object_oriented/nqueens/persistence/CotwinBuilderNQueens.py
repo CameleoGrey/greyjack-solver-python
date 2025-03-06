@@ -1,14 +1,18 @@
+
+
+
+from greyjack.persistence.CotwinBuilderBase import CotwinBuilderBase
 from examples.object_oriented.nqueens.cotwin.NQueensCotwin import NQueensCotwin
 from examples.object_oriented.nqueens.score.NQueensScoreCalculator import NQueensScoreCalculator
 from examples.object_oriented.nqueens.cotwin.CotQueen import CotQueen
 from greyjack.variables.GJInteger import GJInteger
 
 
-class CotwinBuilder():
+class CotwinBuilderNQueens(CotwinBuilderBase):
     def __init__(self):
         pass
 
-    def build_cotwin(self, domain_model):
+    def build_cotwin(self, domain_model, is_already_initialized):
 
         n = domain_model.n
         queens = domain_model.queens
@@ -23,7 +27,7 @@ class CotwinBuilder():
 
         nqueens_cotwin = NQueensCotwin()
         nqueens_cotwin.add_planning_entities_list( cot_queens, "queens" )
-        nqueens_cotwin.add_score_calculator( NQueensScoreCalculator(), "nqueens_score_calculator" )
+        nqueens_cotwin.set_score_calculator( NQueensScoreCalculator() )
 
         return nqueens_cotwin
 

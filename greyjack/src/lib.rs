@@ -18,6 +18,8 @@ fn greyjack(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<score_calculation::scores::HardSoftScore>()?;
     m.add_class::<score_calculation::scores::HardMediumSoftScore>()?;
 
+    m.add_class::<score_calculation::score_requesters::VariablesManagerPy>()?;
+
     //py.import("sys")?.getattr("modules")?.set_item("greyjack.greyjack", m)?;
     //py_run!(py, m, "import sys; sys.modules['greyjack.greyjack'] = greyjack");
 

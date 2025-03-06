@@ -18,7 +18,8 @@ class Individual:
         return self.score < other.score
     
     def as_list(self):
-        return [self.variable_values.tolist(), self.score.as_list()]
+        return [self.variable_values.tolist() if isinstance(self.variable_values, np.ndarray) else self.variable_values, 
+                self.score.as_list()]
     
     @staticmethod
     def from_list(list_individual):
@@ -31,9 +32,14 @@ class Individual:
         else:
             raise ("Can't define score type while inverse converting of list of individuals-lists")
         
-        variable_array = np.array( list_individual[0], dtype=np.float64 )
+        # original from prototype
+        #variable_values = np.array( list_individual[0], dtype=np.float64 )
+        #score = score_type( *list_individual[1] )
+        #individual = Individual( variable_values, score )
+
+        # temporary variant while merging with Rust
         score = score_type( *list_individual[1] )
-        individual = Individual( variable_array, score )
+        individual = Individual( list_individual[0], score )
 
         return individual
 
@@ -60,9 +66,13 @@ class Individual:
 
         individuals_list = []
         for list_individual in list_of_lists:
-            variable_array = np.array( list_individual[0], dtype=np.float64 )
+            # original from prototype
+            #variable_values = np.array( list_individual[0], dtype=np.float64 )
+            # temporary variant while merging with Rust
+            variable_values = list_individual[0]
+
             score = score_type( *list_individual[1] )
-            individual = Individual( variable_array, score )
+            individual = Individual( variable_values, score )
             individuals_list.append( individual )
         
         return individuals_list

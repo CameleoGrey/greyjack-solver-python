@@ -17,14 +17,14 @@ class ScoreNoImprovement(TerminationStrategy):
         if self.start_time is None:
             self.start_time = datetime.now()
             self.time_delta = (self.start_time - self.start_time).seconds
-            self.current_best_score = agent.current_top_individual.score
+            self.current_best_score = agent.agent_top_individual.score
             return
         
         # to prevent updates from migrants
         if self.is_accomplish():
             return
         
-        current_score = agent.current_top_individual.score
+        current_score = agent.agent_top_individual.score
 
         if current_score < self.current_best_score:
             self.current_best_score = current_score

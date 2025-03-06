@@ -1,7 +1,10 @@
 
 
 use pyo3::prelude::*;
-use crate::variables::GJPlanningVariable;
+use pyo3::types::PyList;
+use pyo3::pycell::*;
+
+use crate::variables::{GJPlanningVariable, GJPlanningVariablePy};
 use polars::prelude::*;
 use ndarray::Array1;
 use std::collections::HashMap;
@@ -10,7 +13,10 @@ use rand::SeedableRng;
 use rand::rngs::StdRng;
 use rand_distr::{Distribution, Uniform};
 
-pub struct VariablesManager {
+use super::VariablesManager;
+
+#[pyclass]
+pub struct VariablesManagerPy {
     variables_vec: Vec<GJPlanningVariable>,
     pub variables_count: usize,
     pub variable_ids: Vec<usize>,
@@ -23,10 +29,38 @@ pub struct VariablesManager {
     pub discrete_ids: Option<Vec<usize>>
 }
 
-impl VariablesManager {
+#[pymethods]
+impl VariablesManagerPy {
     
-    pub fn new(variables_vec: Vec<GJPlanningVariable>) -> Self {
+    #[getter]
+    pub fn variables_count(&self) -> PyResult<usize> {
+        Ok(self.variables_count.clone())
+    }
 
+    #[getter]
+    pub fn semantic_groups_map(&self) -> PyResult<HashMap<String, Vec<usize>>> {
+        Ok(self.semantic_groups_map.clone())
+    }
+
+    #[getter]
+    pub fn discrete_ids(&self) -> PyResult<Option<Vec<usize>>> {
+        Ok(self.discrete_ids.clone())
+    }
+
+    #[new]
+    pub fn new(variables_vec_py: Vec<GJPlanningVariablePy>) -> Self {
+
+        let mut variables_vec: Vec<GJPlanningVariable> = variables_vec_py.iter().map(|var_py| {
+            GJPlanningVariable::new(
+                var_py.name.clone(), 
+                var_py.lower_bound, 
+                var_py.upper_bound, 
+                var_py.frozen, 
+                var_py.is_int, 
+                var_py.initial_value, 
+                Some(var_py.semantic_groups.clone()),
+            )
+        }).collect();
         let mut variable_ids: Vec<usize> = Vec::new();
         let mut lower_bounds: Vec<f64> = Vec::new();
         let mut upper_bounds: Vec<f64> = Vec::new();
@@ -43,7 +77,7 @@ impl VariablesManager {
             }
         }
 
-        let semantic_groups_dict = Self::build_semantic_groups_dict(&variables_vec);
+        let semantic_groups_dict = VariablesManager::build_semantic_groups_dict(&variables_vec);
         let semantic_group_keys: Vec<String> = semantic_groups_dict.keys().into_vec().iter().map(|x| x.to_string()).collect();
         let n_semantic_groups = semantic_group_keys.len();
         let discrete_ids_option;
@@ -68,28 +102,6 @@ impl VariablesManager {
 
     }
 
-    pub fn build_semantic_groups_dict(variables_vec: &Vec<GJPlanningVariable>) -> HashMap<String, Vec<usize>> {
-
-        let mut semantic_groups_dict: HashMap<String, Vec<usize>> = HashMap::new();
-        for i in 0..variables_vec.len() {
-            let variable = &variables_vec[i];
-            let variable_semantic_groups = &variable.semantic_groups;
-            let is_frozen_variable = variable.frozen;
-
-            for group_name in variable_semantic_groups {
-                if semantic_groups_dict.contains_key(group_name) == false {
-                    semantic_groups_dict.insert(group_name.clone(), Vec::new());
-                }
-                if is_frozen_variable {
-                    continue;
-                }
-                semantic_groups_dict.get_mut(group_name).unwrap().push(i);
-            }
-        }
-
-        return semantic_groups_dict;
-    }
-
     pub fn get_random_semantic_group_ids(&self) -> (&Vec<usize>, &String) {
         let random_group_id = Uniform::new(0, self.n_semantic_groups).sample(&mut StdRng::from_entropy());
         let group_name = &self.semantic_group_keys[random_group_id];
@@ -101,9 +113,9 @@ impl VariablesManager {
         Uniform::new(self.lower_bounds[column_id], self.upper_bounds[column_id]).sample(&mut StdRng::from_entropy())
     }
 
-    pub fn sample_variables(&mut self) -> Array1<f64> {
+    pub fn sample_variables(&mut self) -> Vec<f64> {
 
-        let mut values_array: Array1<f64> = Array1::zeros(self.variables_count);
+        let mut values_array: Vec<f64> = vec![0.0; self.variables_count];
         for i in 0..self.variables_count {
 
             let variable = &mut self.variables_vec[i];
@@ -120,7 +132,7 @@ impl VariablesManager {
         }).collect()
     }
 
-    pub fn fix_variables(&self, values_array: &mut Array1<f64>, ids_to_fix: Option<Vec<usize>>) {
+    pub fn fix_variables(&self, values_array: Vec<f64>, ids_to_fix: Option<Vec<usize>>) -> PyResult<Vec<f64>> {
 
         let range_ids;
         match ids_to_fix {
@@ -128,12 +140,15 @@ impl VariablesManager {
             None => range_ids = Vec::from_iter( (0..self.variables_count).into_iter() )
         }
 
+        let mut values_array_clone = values_array.clone();
         let stub_collection: () = range_ids.iter().map(|i| {
-            values_array[*i] = self.variables_vec[*i].fix(values_array[*i])
+            values_array_clone[*i] = self.variables_vec[*i].fix(values_array[*i])
         }).collect();
+
+        return Ok(values_array_clone);
     }
 
-    pub fn fix_deltas(&self, deltas: &mut Vec<f64>, ids_to_fix: Option<Vec<usize>>) {
+    pub fn fix_deltas(&self, deltas: Vec<f64>, ids_to_fix: Option<Vec<usize>>) -> PyResult<Vec<f64>> {
 
         let range_ids;
         match ids_to_fix {
@@ -141,12 +156,13 @@ impl VariablesManager {
             None => range_ids = Vec::from_iter( (0..self.variables_count).into_iter() )
         }
 
-        let _: () = 
-        range_ids.iter()
-        .enumerate()
+        let mut deltas_clone = deltas.clone();
+        let _: () = range_ids.iter().enumerate()
         .map(|(delta_id, var_id)| {
-            deltas[delta_id] = self.variables_vec[*var_id].fix(deltas[delta_id])
+            deltas_clone[delta_id] = self.variables_vec[*var_id].fix(deltas[delta_id])
         }).collect();
+
+        return Ok(deltas_clone);
     }
 
 }
