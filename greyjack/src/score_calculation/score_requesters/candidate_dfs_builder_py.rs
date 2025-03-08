@@ -9,8 +9,6 @@ use crate::score_calculation::score_requesters::VariablesManager;
 use crate::variables::GJPlanningVariablePy;
 use crate::variables::GJPlanningVariable;
 use crate::score_calculation::score_requesters::CandidateDfsBuilder;
-
-use std::ops::AddAssign;
 use std:: collections::HashMap;
 use std::string::String;
 
@@ -32,6 +30,7 @@ impl CandidateDfsBuilderPy {
         problem_facts_column_map: HashMap<String, Vec<String>>,
         planning_entity_dfs_py: HashMap<String, PyDataFrame>,
         problem_fact_dfs_py: HashMap<String, PyDataFrame>,
+        entity_is_int_map: HashMap<String, bool>,
     ) -> Self {
 
         let mut variables_vec: Vec<GJPlanningVariable> = variables_vec_py.iter().map(|var_py| {
@@ -62,6 +61,7 @@ impl CandidateDfsBuilderPy {
             planning_entity_dfs: planning_entity_dfs.clone(),
             problem_fact_dfs: problem_fact_dfs,
             raw_dfs: planning_entity_dfs.clone(),
+            entity_is_int_map: entity_is_int_map,
             
             variables_manager: VariablesManager::new(variables_vec),
 
@@ -82,16 +82,6 @@ impl CandidateDfsBuilderPy {
             candidate_dfs_builder: candidate_dfs_builder
         }
 
-    }
-
-    #[getter]
-    pub fn semantic_groups_map(&self) -> PyResult<HashMap<String, Vec<usize>>> {
-        Ok(self.candidate_dfs_builder.variables_manager.semantic_groups_map.clone())
-    }
-
-    #[getter]
-    pub fn discrete_ids(&self) -> PyResult<Option<Vec<usize>>> {
-        Ok(self.candidate_dfs_builder.variables_manager.discrete_ids.clone())
     }
 
     pub fn get_plain_candidate_dfs(&mut self, samples: Vec<Vec<f64>>) -> (HashMap<String, PyDataFrame>, HashMap<String, PyDataFrame>) {

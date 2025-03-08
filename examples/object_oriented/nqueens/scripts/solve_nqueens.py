@@ -28,7 +28,7 @@ if __name__ == "__main__":
     #termination_strategy = ScoreLimit(score_to_compare=[0])
     agent = TabuSearch(neighbours_count=128, tabu_entity_rate=0.0, 
                        mutation_rate_multiplier=None, move_probas=None, 
-                       migration_frequency=1, termination_strategy=termination_strategy)
+                       migration_frequency=10, termination_strategy=termination_strategy)
 
     solver = Solver(domain_builder, cotwin_builder, agent, 
                     n_jobs=10, parallelization_backend="processing", #processing, threading 

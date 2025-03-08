@@ -1,24 +1,8 @@
 
-from typing import Dict, List, Tuple, Any
 import polars as pl
-import numpy as np
-from collections import defaultdict
-from greyjack.score_calculation.score_requesters.VariablesManager import VariablesManager
-from greyjack.greyjack import GJPlanningVariablePy, VariablesManagerPy
+from greyjack.greyjack import VariablesManagerPy, CandidateDfsBuilderPy
 from greyjack.variables import *
 
-# mostly rewrited by LLM from Rust to Python
-
-
-from typing import Dict, List, Tuple, Any
-import polars as pl
-import numpy as np
-from collections import defaultdict
-from greyjack.score_calculation.score_requesters.VariablesManager import VariablesManager
-from greyjack.greyjack import GJPlanningVariablePy, VariablesManagerPy, CandidateDfsBuilderPy
-from greyjack.variables import *
-
-# mostly rewrited by LLM from Rust to Python 
 class OOPScoreRequester:
     def __init__(self, cotwin):
         self.cotwin = cotwin
@@ -26,8 +10,8 @@ class OOPScoreRequester:
         self.available_planning_variable_types = {GJFloat, GJInteger, GJBinary}
         variables_vec, var_name_to_vec_id_map, vec_id_to_var_name_map = self.build_variables_info(self.cotwin)
         self.variables_manager = VariablesManagerPy(variables_vec)
-        planning_entities_column_map = self.build_column_map(self.cotwin.planning_entities)
-        problem_facts_column_map = self.build_column_map(self.cotwin.problem_facts)
+        planning_entities_column_map, entity_is_int_map = self.build_column_map(self.cotwin.planning_entities)
+        problem_facts_column_map, _ = self.build_column_map(self.cotwin.problem_facts)
         planning_entity_dfs = self.build_group_dfs(self.cotwin.planning_entities, planning_entities_column_map, True)
         problem_fact_dfs = self.build_group_dfs(self.cotwin.problem_facts, problem_facts_column_map, False)
 
@@ -38,10 +22,10 @@ class OOPScoreRequester:
             planning_entities_column_map,
             problem_facts_column_map,
             planning_entity_dfs,
-            problem_fact_dfs
+            problem_fact_dfs,
+            entity_is_int_map
         )
 
-    # mostly from prototype
     def build_variables_info(self, cotwin):
         variables_vec = []
         var_name_to_vec_id_map = {}
@@ -66,12 +50,10 @@ class OOPScoreRequester:
 
         return variables_vec, var_name_to_vec_id_map, vec_id_to_var_name_map
 
-    # original from prototype
     def build_column_map(self, entity_groups):
         
-        # Python dict saves order, that's why when I was using HashMap in Rust
-        # there was bug, until I added cotwin object conversion .to_vec()
         column_dict = {}
+        entity_is_int_map = {}
         for group_name in entity_groups:
             column_dict[group_name] = []
             entity_objects = entity_groups[group_name]
@@ -79,10 +61,14 @@ class OOPScoreRequester:
             object_attributes = sample_object.__dict__
             for attribute_name in object_attributes:
                 column_dict[group_name].append( attribute_name )
+                attribute_value = object_attributes[attribute_name]
+                if isinstance(attribute_value, GJFloat):
+                    entity_is_int_map[attribute_name] = False
+                else:
+                    entity_is_int_map[attribute_name] = True
 
-        return column_dict
-
-    # original from prototype
+        return column_dict, entity_is_int_map
+    
     def build_group_dfs(self, entity_groups, column_dict, is_planning):
 
         df_dict = {}
@@ -92,7 +78,6 @@ class OOPScoreRequester:
             df_data = []
 
             entity_group = entity_groups[df_name]
-            entities_count = len(entity_group)
             for entity_object in entity_group:
                 row_data = []
                 object_attributes = entity_object.__dict__

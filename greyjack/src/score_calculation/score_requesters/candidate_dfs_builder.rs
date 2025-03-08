@@ -31,6 +31,7 @@ pub struct CandidateDfsBuilder {
         pub planning_entity_dfs: HashMap<String, DataFrame>,
         pub problem_fact_dfs: HashMap<String, DataFrame>,
         pub raw_dfs: HashMap<String, DataFrame>,
+        pub entity_is_int_map: HashMap<String, bool>,
 }
 
 impl CandidateDfsBuilder {
@@ -43,6 +44,7 @@ impl CandidateDfsBuilder {
             problem_facts_column_map: HashMap<String, Vec<String>>,
             planning_entity_dfs: HashMap<String, DataFrame>,
             problem_fact_dfs: HashMap<String, DataFrame>,
+            entity_is_int_map: HashMap<String, bool>,
         ) -> Self {
 
             let mut score_requester = Self {
@@ -51,6 +53,7 @@ impl CandidateDfsBuilder {
                 planning_entity_dfs: planning_entity_dfs.clone(),
                 problem_fact_dfs: problem_fact_dfs,
                 raw_dfs: planning_entity_dfs.clone(),
+                entity_is_int_map: entity_is_int_map,
                 
                 variables_manager: VariablesManager::new(variables_vec),
 
@@ -87,7 +90,16 @@ impl CandidateDfsBuilder {
                 for column_name in group_data_map[df_name].keys() {
                     current_df.drop_in_place(column_name).unwrap();
                     let updated_column_data = &group_data_map[df_name][column_name];
-                    let updated_column = Series::new(column_name.into(), updated_column_data);
+                    let mut updated_column = Series::new(column_name.into(), updated_column_data);
+                    if self.entity_is_int_map.contains_key(column_name) {
+                        if *self.entity_is_int_map.get(column_name).unwrap() {
+                            updated_column = updated_column.cast(&DataType::Int64).unwrap();
+                        }
+                    } else if column_name.eq("sample_id") {
+                        updated_column = updated_column.cast(&DataType::UInt64).unwrap();
+                    }
+
+
                     current_df.with_column(updated_column).unwrap();
                 }
                 current_df.rechunk_mut();

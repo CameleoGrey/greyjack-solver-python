@@ -4,7 +4,7 @@ import math
 from greyjack.agents.metaheuristic_bases.Mover import Mover
 from greyjack.agents.base.Individual import Individual
 
-# mostly rewrited by LLM (Rust->Python) for tests purpose only. Will be replaced by normally wrapped Rust version
+
 class TabuSearchBase:
     def __init__(
         self,

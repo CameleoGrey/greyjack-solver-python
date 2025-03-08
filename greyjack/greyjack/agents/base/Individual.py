@@ -2,6 +2,7 @@
 import numpy as np
 from greyjack.score_calculation.scores.SimpleScore import SimpleScore
 from greyjack.score_calculation.scores.HardSoftScore import HardSoftScore
+from greyjack.score_calculation.scores.HardMediumSoftScore import HardMediumSoftScore
 
 
 class Individual:
@@ -29,6 +30,8 @@ class Individual:
             score_type = SimpleScore
         elif score_len == 2:
             score_type = HardSoftScore
+        elif score_len == 3:
+            score_type = HardMediumSoftScore
         else:
             raise ("Can't define score type while inverse converting of list of individuals-lists")
         
