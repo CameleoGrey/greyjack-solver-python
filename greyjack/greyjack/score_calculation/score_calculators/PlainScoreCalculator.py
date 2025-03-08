@@ -59,6 +59,7 @@ class PlainScoreCalculator:
             for name in self.constraints
         ]
 
+        constraints_names_list = list(self.constraints.keys())
         constraints_count = len(scores_vec)
         samples_count = len(scores_vec[0])
         scores = []
@@ -66,7 +67,7 @@ class PlainScoreCalculator:
         for j in range(samples_count):
             sample_sum_score = self.score_type.get_null_score()
             for i in range(constraints_count):
-                constraint_weight = self.constraint_weights[list(self.constraints.keys())[i]]
+                constraint_weight = self.constraint_weights[constraints_names_list[i]]
                 weighted_score = scores_vec[i][j].mul(constraint_weight)
                 sample_sum_score = sample_sum_score + weighted_score
             scores.append(sample_sum_score)

@@ -9,11 +9,8 @@ project_dir_id = script_dir_path.parts.index("greyjack-solver-python")
 project_dir_path = Path(*script_dir_path.parts[:project_dir_id+1])
 sys.path.append(str(project_dir_path))
 
-from copy import deepcopy
-
 from examples.object_oriented.nqueens.persistence.DomainBuilderNQueens import DomainBuilderNQueens
 from examples.object_oriented.nqueens.persistence.CotwinBuilderNQueens import CotwinBuilderNQueens
-from greyjack.score_calculation.scores.SimpleScore import SimpleScore
 from greyjack.agents.termination_strategies import *
 from greyjack.agents import *
 from greyjack.Solver import Solver
@@ -26,9 +23,9 @@ if __name__ == "__main__":
     cotwin_builder = CotwinBuilderNQueens()
 
     #termination_strategy = StepsLimit(step_count_limit=1000)
-    #termination_strategy = TimeSpentLimit(time_seconds_limit=60)
+    termination_strategy = TimeSpentLimit(time_seconds_limit=60)
     #termination_strategy = ScoreNoImprovement(time_seconds_limit=15)
-    termination_strategy = ScoreLimit(score_to_compare=[0])
+    #termination_strategy = ScoreLimit(score_to_compare=[0])
     agent = TabuSearch(neighbours_count=128, tabu_entity_rate=0.0, 
                        mutation_rate_multiplier=None, move_probas=None, 
                        migration_frequency=1, termination_strategy=termination_strategy)
@@ -37,7 +34,7 @@ if __name__ == "__main__":
                     n_jobs=10, parallelization_backend="processing", #processing, threading 
                     score_precision=[0], logging_level="info")
     solution = solver.solve()
-    print( "Cotwin solution looks that: " )
-    print( solution )
+    #print( "Cotwin solution looks that: " )
+    #print( solution )
 
     print( "done" )

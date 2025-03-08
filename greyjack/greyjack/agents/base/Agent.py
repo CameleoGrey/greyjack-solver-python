@@ -123,8 +123,10 @@ class Agent():
             start_time = time.perf_counter()
             try:
                 if self.agent_status == "alive":
-                    if self.cotwin.score_calculator.is_incremental: self.step_incremental()
-                    else: self.step_plain()
+                    if self.cotwin.score_calculator.is_incremental: 
+                        self.step_incremental()
+                    else: 
+                        self.step_plain()
             except Exception as e:
                 print(e)
                 exit(-1)
