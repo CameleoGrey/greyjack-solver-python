@@ -39,6 +39,7 @@ class Agent():
         self.steps_to_send_updates = migration_frequency
         self.agent_status = "alive"
         self.round_robin_status_dict = {}
+        self.total_agents_count = None
 
         # windows updates send/receive
         self.context = None
@@ -141,9 +142,10 @@ class Agent():
                 if self.logging_level in ["trace"] and self.agent_status == "alive":
                     self.logger.info(f"Agent: {self.agent_id} Step: {step_id} Global best: {self.agent_top_individual.score}, Step time: {total_time:.6f}")
 
-                self.steps_to_send_updates -= 1
-                if self.steps_to_send_updates <= 0:
-                    self.send_receive_updates()
+                if self.total_agents_count > 1:
+                    self.steps_to_send_updates -= 1
+                    if self.steps_to_send_updates <= 0:
+                        self.send_receive_updates()
 
                 if self.termination_strategy.is_accomplish():
                     self.agent_status = "dead"

@@ -27,7 +27,6 @@ class NQueensScoreCalculator(PlainScoreCalculator):
     def all_different(self, planning_entity_dfs, problem_fact_dfs):
 
         queens_df = planning_entity_dfs["queens"]
-        #print(queens_df)
         same_row_id_counts = (
             queens_df
             .lazy()

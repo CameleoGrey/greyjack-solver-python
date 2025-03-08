@@ -194,6 +194,7 @@ class Solver():
             agents[i].initial_solution = deepcopy(self.initial_solution)
             agents[i].score_precision = deepcopy(self.score_precision)
             agents[i].logging_level = deepcopy(self.logging_level)
+            agents[i].total_agents_count = self.n_jobs
             self.agent_statuses[str(i)] = "alive"
 
         for i in range(self.n_jobs):
