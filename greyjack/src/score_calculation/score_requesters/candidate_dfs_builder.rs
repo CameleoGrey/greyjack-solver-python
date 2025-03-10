@@ -3,12 +3,9 @@
 
 
 use polars::prelude::*;
-use pyo3::prelude::*;
 use crate::score_calculation::score_requesters::VariablesManager;
-use crate::variables::GJPlanningVariablePy;
 use crate::variables::GJPlanningVariable;
 
-use std::ops::AddAssign;
 use std:: collections::HashMap;
 use std::string::String;
 
@@ -47,7 +44,7 @@ impl CandidateDfsBuilder {
             entity_is_int_map: HashMap<String, bool>,
         ) -> Self {
 
-            let mut score_requester = Self {
+            let score_requester = Self {
                 planning_entities_column_map: planning_entities_column_map,
                 problem_facts_column_map: problem_facts_column_map,
                 planning_entity_dfs: planning_entity_dfs.clone(),

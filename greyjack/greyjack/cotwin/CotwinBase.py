@@ -4,7 +4,7 @@ class CotwinBase():
     def __init__(self):
         self.planning_entities = {}
         self.problem_facts = {}
-        self.score_calculators = {}
+        self.score_calculator = None
         pass
 
     def _set_solution_status(self, status):

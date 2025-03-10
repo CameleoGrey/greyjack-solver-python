@@ -2,7 +2,7 @@ import random
 from collections import defaultdict, deque
 import math
 from greyjack.agents.metaheuristic_bases.Mover import Mover
-from greyjack.agents.base.Individual import Individual
+from greyjack.agents.base.individuals.Individual import Individual
 
 
 class TabuSearchBase:

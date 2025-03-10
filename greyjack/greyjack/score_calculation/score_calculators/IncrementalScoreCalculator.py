@@ -2,6 +2,10 @@
 from greyjack.score_calculation.scores.SimpleScore import SimpleScore
 from greyjack.score_calculation.scores.HardSoftScore import HardSoftScore
 from greyjack.score_calculation.scores.HardMediumSoftScore import HardMediumSoftScore
+from greyjack.score_calculation.scores.ScoreVariants import ScoreVariants
+from greyjack.agents.base.individuals.IndividualSimple import IndividualSimple
+from greyjack.agents.base.individuals.IndividualHardSoft import IndividualHardSoft
+from greyjack.agents.base.individuals.IndividualHardMediumSoft import IndividualHardMediumSoft
 
 class IncrementalScoreCalculator:
     def __init__(self):
@@ -11,6 +15,7 @@ class IncrementalScoreCalculator:
         self.prescoring_functions = {}
 
         self.score_type = None
+        self.score_variant = None
         self.is_incremental = False
 
     def add_constraint(self, constraint_name, constraint_function):
@@ -41,14 +46,14 @@ class IncrementalScoreCalculator:
 
     def get_score(self, planning_entity_dfs, problem_fact_dfs, delta_dfs):
 
-        if self.score_type is None:
-            raise Exception("score_type in PlainScoreCalculator is None. Set the score type while building cotwin. Warning! Use the same score type inside all constraints.")
-        elif isinstance(self.score_type, str):
-            if self.score_type == "SimpleScore":
+        if self.score_variant is None:
+            raise Exception("score_variant in PlainScoreCalculator is None. Set the score variant inside score calculator class. Warning! Use the same related score type inside all constraints.")
+        else:
+            if self.score_variant == ScoreVariants.SimpleScore:
                 self.score_type = SimpleScore
-            if self.score_type == "HardSoftScore":
+            if self.score_variant == ScoreVariants.HardSoftScore:
                 self.score_type = HardSoftScore
-            if self.score_type == "HardMediumSoftScore":
+            if self.score_variant == ScoreVariants.HardMediumSoftScore:
                 self.score_type = HardMediumSoftScore
 
         for prescoring_function in self.prescoring_functions.values():

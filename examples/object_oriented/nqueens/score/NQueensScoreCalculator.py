@@ -2,6 +2,7 @@
 
 from greyjack.score_calculation.score_calculators.PlainScoreCalculator import PlainScoreCalculator
 from greyjack.score_calculation.scores.SimpleScore import SimpleScore
+from greyjack.score_calculation.scores.ScoreVariants import ScoreVariants
 import polars as pl
 
 #import os
@@ -14,7 +15,7 @@ class NQueensScoreCalculator(PlainScoreCalculator):
 
         super().__init__()
 
-        self.score_type = "SimpleScore"
+        self.score_variant = ScoreVariants.SimpleScore
 
         #self.add_constraint("different_rows", self.different_rows)
         #self.add_constraint("different_descending_diagonals", self.different_descending_diagonals)

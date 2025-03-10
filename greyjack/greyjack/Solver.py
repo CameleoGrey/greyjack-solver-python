@@ -4,7 +4,7 @@ import time
 import random
 
 from greyjack.agents.base.GJSolution import GJSolution
-from greyjack.agents.base.Individual import Individual
+from greyjack.agents.base.individuals.Individual import Individual
 from pathos.multiprocessing import ProcessPool
 from pathos.threading import ThreadPool
 import multiprocessing
@@ -127,8 +127,9 @@ class Solver():
             agent_id = agent_publication["agent_id"]
             agent_status = agent_publication["status"]
             local_step = agent_publication["step"]
+            score_variant = agent_publication["score_variant"]
             solution_candidate = agent_publication["candidate"]
-            solution_candidate = Individual.from_list(solution_candidate)
+            solution_candidate = Individual.get_related_individual_type_by_value(score_variant).from_list(solution_candidate)
 
             new_best_flag = False
             if current_best_candidate is None:

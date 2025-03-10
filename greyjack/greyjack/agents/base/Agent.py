@@ -7,10 +7,10 @@ import time
 import zmq
 import sys
 
-from greyjack.agents.base.Individual import Individual
 from greyjack.agents.termination_strategies import *
 from greyjack.score_calculation.score_requesters import OOPScoreRequester
 from greyjack.score_calculation.score_calculators import PlainScoreCalculator, IncrementalScoreCalculator
+from greyjack.agents.base.individuals.Individual import Individual
 
 current_platform = sys.platform
 
@@ -25,6 +25,8 @@ class Agent():
         self.agent_id = None
         self.population_size = None
         self.population = None
+        self.individual_type = None
+        self.score_variant = None
         self.agent_top_individual = None
         self.logger = None
         self.logging_level = None
@@ -85,7 +87,10 @@ class Agent():
             domain = self.domain_builder.build_from_domain(self.initial_solution)
 
         self.cotwin = self.cotwin_builder.build_cotwin(domain, is_already_initialized)
-        
+    
+    def _define_individual_type(self):
+        self.score_variant = self.cotwin.score_calculator.score_variant
+        self.individual_type = Individual.get_related_individual_type(self.cotwin.score_calculator.score_variant)
     
     # implements by concrete metaheuristics
     def _build_metaheuristic_base(self):
@@ -106,6 +111,7 @@ class Agent():
 
         try:
             self._build_cotwin()
+            self._define_individual_type()
             self._build_metaheuristic_base()
             self._build_logger()
             self.init_population()
@@ -167,13 +173,13 @@ class Agent():
             scores = self.score_requester.request_score_plain(samples)
 
             for i in range(self.population_size):
-                self.population.append(Individual(samples[i].copy(), scores[i]))
+                self.population.append(self.individual_type(samples[i].copy(), scores[i]))
 
         else:
             generated_sample = self.score_requester.variables_manager.sample_variables()
             deltas = [[(i, val) for i, val in enumerate(generated_sample)]]
             scores = self.score_requester.request_score_incremental(generated_sample, deltas)
-            self.population.append(Individual(generated_sample, scores[0]))
+            self.population.append(self.individual_type(generated_sample, scores[0]))
 
     def step_plain(self):
         new_population = []
@@ -183,7 +189,7 @@ class Agent():
             for score in scores:
                 score.round(self.score_precision)
 
-        candidates = [Individual(samples[i].copy(), scores[i]) for i in range(len(samples))]
+        candidates = [self.individual_type(samples[i].copy(), scores[i]) for i in range(len(samples))]
         new_population = self.metaheuristic_base.build_updated_population(self.population, candidates)
 
         self.population = new_population
@@ -246,7 +252,7 @@ class Agent():
         # assuming that all updates are sorted by agents themselves
         # (individual with id == 0 is best in update-subpopulation)
         migrants = self.population[:migrants_count]
-        migrants = Individual.convert_individuals_to_lists(migrants)
+        migrants = self.individual_type.convert_individuals_to_lists(migrants)
         request = {"agent_id": self.agent_id, 
                    "round_robin_status_dict": self.round_robin_status_dict,
                    "request_type": "put_updates", 
@@ -298,14 +304,14 @@ class Agent():
         if self.metaheuristic_base.metaheuristic_name == "LSHADE":
             history_migrant = updates_reply["history_archive"]
             if (history_migrant is not None and len(self.history_archive) > 0):
-                history_migrant = Individual.from_list(history_migrant)
+                history_migrant = self.individual_type.from_list(history_migrant)
                 rand_id = self.generator.integers(0, len(self.history_archive), 1)[0]
                 #if updates_reply["history_archive"] < self.history_archive[-1]:
                 if history_migrant < self.history_archive[rand_id]:
                     self.history_archive[rand_id] = history_migrant
 
         migrants = updates_reply["migrants"]
-        migrants = Individual.convert_lists_to_individuals(migrants)
+        migrants = self.individual_type.convert_lists_to_individuals(migrants)
         n_migrants = len(migrants)
 
         # population already sorted after step
@@ -350,7 +356,7 @@ class Agent():
         # assuming that all updates are sorted by agents themselves
         # (individual with id == 0 is best in update-subpopulation)
         migrants = self.population[:migrants_count]
-        migrants = Individual.convert_individuals_to_lists(migrants)
+        migrants = self.individual_type.convert_individuals_to_lists(migrants)
         request = {"agent_id": self.agent_id, 
                    "round_robin_status_dict": self.round_robin_status_dict,
                    "request_type": "put_updates", 
@@ -388,14 +394,14 @@ class Agent():
         if self.metaheuristic_base.metaheuristic_name == "LSHADE":
             history_migrant = updates_reply["history_archive"]
             if (history_migrant is not None and len(self.history_archive) > 0):
-                history_migrant = Individual.from_list(history_migrant)
+                history_migrant = self.individual_type.from_list(history_migrant)
                 rand_id = self.generator.integers(0, len(self.history_archive), 1)[0]
                 #if updates_reply["history_archive"] < self.history_archive[-1]:
                 if history_migrant < self.history_archive[rand_id]:
                     self.history_archive[rand_id] = history_migrant
 
         migrants = updates_reply["migrants"]
-        migrants = Individual.convert_lists_to_individuals(migrants)
+        migrants = self.individual_type.convert_lists_to_individuals(migrants)
         n_migrants = len(migrants)
 
         # population already sorted after step
@@ -429,6 +435,7 @@ class Agent():
         agent_publication["status"] = self.agent_status
         agent_publication["candidate"] = self.agent_top_individual.as_list()
         agent_publication["step"] = step_id
+        agent_publication["score_variant"] = self.score_variant
         agent_publication = orjson.dumps( agent_publication )
         self.socket_publisher.send( agent_publication )
 
@@ -438,4 +445,5 @@ class Agent():
         agent_publication["status"] = self.agent_status
         agent_publication["candidate"] = self.agent_top_individual.as_list()
         agent_publication["step"] = step_id
+        agent_publication["score_variant"] = self.score_variant
         self.socket_publisher.send( agent_publication )

@@ -4,8 +4,12 @@ use pyo3::{prelude::*, wrap_pymodule, py_run};
 mod score_calculation;
 mod variables;
 mod utils;
+mod agents;
 
-
+use score_calculation::scores::*;
+build_concrete_individual!(IndividualSimple, SimpleScore);
+build_concrete_individual!(IndividualHardSoft, HardSoftScore);
+build_concrete_individual!(IndividualHardMediumSoft, HardMediumSoftScore);
 
 #[pymodule]
 fn greyjack(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
@@ -18,9 +22,13 @@ fn greyjack(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<score_calculation::scores::HardSoftScore>()?;
     m.add_class::<score_calculation::scores::HardMediumSoftScore>()?;
 
+    // greyjack.base
+    m.add_class::<IndividualSimple>()?;
+    m.add_class::<IndividualHardSoft>()?;
+    m.add_class::<IndividualHardMediumSoft>()?;
+
     m.add_class::<score_calculation::score_requesters::VariablesManagerPy>()?;
     m.add_class::<score_calculation::score_requesters::CandidateDfsBuilderPy>()?;
-
 
     //py.import("sys")?.getattr("modules")?.set_item("greyjack.greyjack", m)?;
     //py_run!(py, m, "import sys; sys.modules['greyjack.greyjack'] = greyjack");

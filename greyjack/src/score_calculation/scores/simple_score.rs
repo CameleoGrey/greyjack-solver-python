@@ -74,8 +74,15 @@ impl SimpleScore {
         return self.simple_value.to_string();
     }
 
-    fn as_list(&self) -> Vec<f64> {
+    pub fn as_list(&self) -> Vec<f64> {
         vec![self.simple_value]
+    }
+
+    #[staticmethod]
+    pub fn from_list(score_list: Vec<f64>) -> Self {
+        Self {
+            simple_value: score_list[0],
+        }
     }
 
 }

@@ -99,8 +99,17 @@ impl HardMediumSoftScore {
         return self.hard_score.to_string() + " | " + &self.medium_score.to_string() + " | " + &self.soft_score.to_string();
     }
 
-    fn as_list(&self) -> Vec<f64> {
+    pub fn as_list(&self) -> Vec<f64> {
         vec![self.hard_score, self.medium_score, self.soft_score]
+    }
+
+    #[staticmethod]
+    pub fn from_list(score_list: Vec<f64>) -> Self {
+        Self {
+            hard_score: score_list[0],
+            medium_score: score_list[1],
+            soft_score: score_list[2]
+        }
     }
 }
 
