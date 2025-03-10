@@ -19,16 +19,16 @@ from greyjack.agents.TabuSearch import TabuSearch
 if __name__ == "__main__":
 
     # build domain model
-    domain_builder = DomainBuilderNQueens(256, random_seed=45)
+    domain_builder = DomainBuilderNQueens(10000, random_seed=45)
     cotwin_builder = CotwinBuilderNQueens()
 
     #termination_strategy = StepsLimit(step_count_limit=1000)
     termination_strategy = TimeSpentLimit(time_seconds_limit=60)
     #termination_strategy = ScoreNoImprovement(time_seconds_limit=15)
     #termination_strategy = ScoreLimit(score_to_compare=[0])
-    agent = TabuSearch(neighbours_count=128, tabu_entity_rate=0.0, 
-                       mutation_rate_multiplier=None, move_probas=None, 
-                       migration_frequency=10, termination_strategy=termination_strategy)
+    agent = TabuSearch(neighbours_count=20, tabu_entity_rate=0.0, 
+                       mutation_rate_multiplier=None, move_probas=[0, 1, 0, 0, 0, 0], 
+                       migration_frequency=1, termination_strategy=termination_strategy)
 
     solver = Solver(domain_builder, cotwin_builder, agent, 
                     n_jobs=10, parallelization_backend="processing", #processing, threading 

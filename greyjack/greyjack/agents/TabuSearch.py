@@ -27,12 +27,14 @@ class TabuSearch(Agent):
         semantic_groups_dict = self.score_requester.variables_manager.semantic_groups_map.copy()
         discrete_ids = self.score_requester.variables_manager.discrete_ids.copy()
 
-        self.metaheuristic_base = TabuSearchBase(
+        self.metaheuristic_base = TabuSearchBase.new(
+            self.cotwin.score_calculator.score_variant,
+            self.score_requester.variables_manager,
             self.neighbours_count,
             self.tabu_entity_rate,
+            semantic_groups_dict,
             self.mutation_rate_multiplier,
             self.move_probas.copy() if self.move_probas else None,
-            semantic_groups_dict,
             discrete_ids,
         )
 

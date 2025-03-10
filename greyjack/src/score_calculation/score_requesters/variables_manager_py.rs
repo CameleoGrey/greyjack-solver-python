@@ -6,7 +6,6 @@ use pyo3::pycell::*;
 
 use crate::variables::{GJPlanningVariable, GJPlanningVariablePy};
 use polars::prelude::*;
-use ndarray::Array1;
 use std::collections::HashMap;
 
 use rand::SeedableRng;
@@ -16,8 +15,9 @@ use rand_distr::{Distribution, Uniform};
 use super::VariablesManager;
 
 #[pyclass]
+#[derive(Clone)]
 pub struct VariablesManagerPy {
-    variables_vec: Vec<GJPlanningVariable>,
+    pub variables_vec: Vec<GJPlanningVariable>,
     pub variables_count: usize,
     pub variable_ids: Vec<usize>,
     pub lower_bounds: Vec<f64>,

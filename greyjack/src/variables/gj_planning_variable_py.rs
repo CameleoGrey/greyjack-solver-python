@@ -61,8 +61,8 @@ impl GJPlanningVariablePy {
     }
 
     #[new]
-    #[pyo3(signature = (name, lower_bound, upper_bound, frozen, is_int, initial_value=None, semantic_groups=None))]
-    pub fn new(name: String, lower_bound: f64, upper_bound: f64, frozen: bool, is_int: bool, initial_value: Option<f64>, semantic_groups: Option<Vec<String>>)  -> PyResult<Self> {
+    #[pyo3(signature = (lower_bound, upper_bound, frozen, is_int, initial_value=None, semantic_groups=None))]
+    pub fn new(lower_bound: f64, upper_bound: f64, frozen: bool, is_int: bool, initial_value: Option<f64>, semantic_groups: Option<Vec<String>>)  -> PyResult<Self> {
         
         let mut current_semantic_groups: Vec<String> = Vec::new();
             match semantic_groups {
@@ -75,7 +75,7 @@ impl GJPlanningVariablePy {
             }
         
         Ok(GJPlanningVariablePy {
-            name: name.to_string(),
+            name: "".to_string(),
             initial_value: initial_value,
             lower_bound: lower_bound,
             upper_bound: upper_bound,

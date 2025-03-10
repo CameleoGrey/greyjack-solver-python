@@ -183,7 +183,7 @@ class Agent():
 
     def step_plain(self):
         new_population = []
-        samples = self.metaheuristic_base.sample_candidates_plain(self.population, self.agent_top_individual, self.score_requester.variables_manager)
+        samples = self.metaheuristic_base.sample_candidates_plain(self.population, self.agent_top_individual)
         scores = self.score_requester.request_score_plain(samples)
         if self.score_precision is not None:
             for score in scores:
@@ -196,7 +196,7 @@ class Agent():
 
     def step_incremental(self):
         new_population = []
-        sample, deltas = self.metaheuristic_base.sample_candidates_incremental(self.population, self.agent_top_individual, self.score_requester.variables_manager)
+        sample, deltas = self.metaheuristic_base.sample_candidates_incremental(self.population, self.agent_top_individual)
         scores = self.score_requester.request_score_incremental(sample, deltas)
         if self.score_precision is not None:
             for score in scores:

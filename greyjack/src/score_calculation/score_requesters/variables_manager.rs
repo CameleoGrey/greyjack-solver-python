@@ -3,7 +3,6 @@
 use pyo3::prelude::*;
 use crate::variables::GJPlanningVariable;
 use polars::prelude::*;
-use ndarray::Array1;
 use std::collections::HashMap;
 
 use rand::SeedableRng;
@@ -11,7 +10,7 @@ use rand::rngs::StdRng;
 use rand_distr::{Distribution, Uniform};
 
 pub struct VariablesManager {
-    variables_vec: Vec<GJPlanningVariable>,
+    pub variables_vec: Vec<GJPlanningVariable>,
     pub variables_count: usize,
     pub variable_ids: Vec<usize>,
     pub lower_bounds: Vec<f64>,
@@ -101,9 +100,9 @@ impl VariablesManager {
         Uniform::new(self.lower_bounds[column_id], self.upper_bounds[column_id]).sample(&mut StdRng::from_entropy())
     }
 
-    pub fn sample_variables(&mut self) -> Array1<f64> {
+    pub fn sample_variables(&mut self) -> Vec<f64> {
 
-        let mut values_array: Array1<f64> = Array1::zeros(self.variables_count);
+        let mut values_array: Vec<f64> = vec![0.0; self.variables_count];
         for i in 0..self.variables_count {
 
             let variable = &mut self.variables_vec[i];
@@ -120,7 +119,7 @@ impl VariablesManager {
         }).collect()
     }
 
-    pub fn fix_variables(&self, values_array: &mut Array1<f64>, ids_to_fix: Option<Vec<usize>>) {
+    pub fn fix_variables(&self, values_array: &mut Vec<f64>, ids_to_fix: Option<Vec<usize>>) {
 
         let range_ids;
         match ids_to_fix {

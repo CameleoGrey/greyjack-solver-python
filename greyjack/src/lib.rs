@@ -11,6 +11,22 @@ build_concrete_individual!(IndividualSimple, SimpleScore);
 build_concrete_individual!(IndividualHardSoft, HardSoftScore);
 build_concrete_individual!(IndividualHardMediumSoft, HardMediumSoftScore);
 
+
+
+use pyo3::prelude::*;
+use crate::score_calculation::score_requesters::{VariablesManagerPy, VariablesManager};
+use crate::score_calculation::scores::*;
+use crate::agents::base::metaheuristic_bases::Mover;
+use rand_distr::num_traits::ToPrimitive;
+use std::collections::HashMap;
+use std::collections::VecDeque;
+use std::collections::HashSet;
+use std::cmp::max;
+build_concrete_tabu_search_base!(TabuSearchSimple, IndividualSimple, SimpleScore);
+build_concrete_tabu_search_base!(TabuSearchHardSoft, IndividualHardSoft, HardSoftScore);
+build_concrete_tabu_search_base!(TabuSearchHardMediumSoft, IndividualHardMediumSoft, HardMediumSoftScore);
+
+
 #[pymodule]
 fn greyjack(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
 
@@ -29,6 +45,11 @@ fn greyjack(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
 
     m.add_class::<score_calculation::score_requesters::VariablesManagerPy>()?;
     m.add_class::<score_calculation::score_requesters::CandidateDfsBuilderPy>()?;
+
+    //metaheuristic bases
+    m.add_class::<TabuSearchSimple>()?;
+    m.add_class::<TabuSearchHardSoft>()?;
+    m.add_class::<TabuSearchHardMediumSoft>()?;
 
     //py.import("sys")?.getattr("modules")?.set_item("greyjack.greyjack", m)?;
     //py_run!(py, m, "import sys; sys.modules['greyjack.greyjack'] = greyjack");

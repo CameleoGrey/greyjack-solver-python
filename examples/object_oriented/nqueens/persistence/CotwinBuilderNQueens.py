@@ -21,7 +21,7 @@ class CotwinBuilderNQueens(CotwinBuilderBase):
         for i in range( len(queens) ):
             queen_id = i
             column_id = i
-            planning_row_id = GJInteger("queen_{}_row_id".format(queen_id), 0, n-1, False, queens[i].row.row_id, None)
+            planning_row_id = GJInteger(0, n-1, False, queens[i].row.row_id, None)
             cot_queen = CotQueen( queen_id, planning_row_id, column_id )
             cot_queens.append( cot_queen )
 
