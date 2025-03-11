@@ -5,6 +5,8 @@ import random
 
 from greyjack.agents.base.GJSolution import GJSolution
 from greyjack.agents.base.individuals.Individual import Individual
+# TODO: create comparing with global top mechanism like in Rust version (by Queue/SimpleQueue for Linux, ZMQ PUB/SUB for other platforms)
+#from greyjack.agents.LateAcceptance import LateAcceptance
 from pathos.multiprocessing import ProcessPool
 from pathos.threading import ThreadPool
 import multiprocessing
@@ -112,11 +114,10 @@ class Solver():
 
         agents = self._setup_agents()
         agents_process_pool = self._run_jobs(agents)
-        #self._subscribe_for_new_solutions()
 
         start_time = time.perf_counter()
         steps_count = 0
-        current_best_candidate = None
+        global_top_individual = None
         while True:
 
             if self.is_windows:
@@ -128,25 +129,25 @@ class Solver():
             agent_status = agent_publication["status"]
             local_step = agent_publication["step"]
             score_variant = agent_publication["score_variant"]
-            solution_candidate = agent_publication["candidate"]
-            solution_candidate = Individual.get_related_individual_type_by_value(score_variant).from_list(solution_candidate)
+            received_individual = agent_publication["candidate"]
+            received_individual = Individual.get_related_individual_type_by_value(score_variant).from_list(received_individual)
 
             new_best_flag = False
-            if current_best_candidate is None:
-                current_best_candidate = solution_candidate
-            elif solution_candidate < current_best_candidate:
-                current_best_candidate = solution_candidate
+            if global_top_individual is None:
+                global_top_individual = received_individual
+            elif received_individual < global_top_individual:
+                global_top_individual = received_individual
                 new_best_flag = True
             total_time = time.perf_counter() - start_time
             steps_count += 1
             new_best_string = "New best score!" if new_best_flag else ""
             if self.logging_level == "trace":
-                self.logger.info(f"Solutions received: {steps_count} Best score: {current_best_candidate.score}, Solving time: {total_time:.6f}, {new_best_string}, Current (agent: {agent_id}, status: {agent_status}, local_step: {local_step}): {solution_candidate.score}")
+                self.logger.info(f"Solutions received: {steps_count} Best score: {global_top_individual.score}, Solving time: {total_time:.6f}, {new_best_string}, Current (agent: {agent_id}, status: {agent_status}, local_step: {local_step}): {received_individual.score}")
             elif self.logging_level == "info":
-                self.logger.info(f"Solutions received: {steps_count} Best score: {current_best_candidate.score}, Solving time: {total_time:.6f} {new_best_string}")
+                self.logger.info(f"Solutions received: {steps_count} Best score: {global_top_individual.score}, Solving time: {total_time:.6f} {new_best_string}")
 
             if len(self.observers) >= 1:
-                self._notify_observers(current_best_candidate)
+                self._notify_observers(global_top_individual)
 
             self.agent_statuses[agent_id] = agent_status
             someone_alive = False
@@ -160,15 +161,11 @@ class Solver():
                 agents_process_pool.terminate()
                 agents_process_pool.close()
                 agents_process_pool.join()
-
-                #atexit.register(agents_process_pool.close)
                 del agents_process_pool
                 gc.collect()
                 break
 
-        #current_best_candidate = self._build_gjsolution_from_individual(current_best_candidate)
-
-        return current_best_candidate     
+        return global_top_individual     
 
     def _run_jobs(self, agents):
         def run_agent_solving(agent):

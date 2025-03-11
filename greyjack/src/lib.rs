@@ -31,6 +31,12 @@ build_concrete_genetic_algorithm_base!(GeneticAlgorithmHardSoft, IndividualHardS
 build_concrete_genetic_algorithm_base!(GeneticAlgorithmHardMediumSoft, IndividualHardMediumSoft, HardMediumSoftScore);
 
 
+build_concrete_late_acceptance_base!(LateAcceptanceSimple, IndividualSimple, SimpleScore);
+build_concrete_late_acceptance_base!(LateAcceptanceHardSoft, IndividualHardSoft, HardSoftScore);
+build_concrete_late_acceptance_base!(LateAcceptanceHardMediumSoft, IndividualHardMediumSoft, HardMediumSoftScore);
+
+
+
 #[pymodule]
 fn greyjack(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
 
@@ -58,6 +64,9 @@ fn greyjack(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<GeneticAlgorithmSimple>()?;
     m.add_class::<GeneticAlgorithmHardSoft>()?;
     m.add_class::<GeneticAlgorithmHardMediumSoft>()?;
+    m.add_class::<LateAcceptanceSimple>()?;
+    m.add_class::<LateAcceptanceHardSoft>()?;
+    m.add_class::<LateAcceptanceHardMediumSoft>()?;
 
     Ok(())
 }
