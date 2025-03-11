@@ -17,6 +17,7 @@ pub struct SimpleScore {
 impl SimpleScore {
 
     #[new]
+    #[pyo3(signature = (simple_value))]
     pub fn new(simple_value: f64) -> Self {
         SimpleScore{
             simple_value

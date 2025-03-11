@@ -19,6 +19,7 @@ pub struct HardMediumSoftScore {
 impl HardMediumSoftScore {
 
     #[new]
+    #[pyo3(signature = (hard_score, medium_score, soft_score))]
     pub fn new(hard_score: f64, medium_score: f64, soft_score: f64) -> Self{
         HardMediumSoftScore{
             hard_score: hard_score,

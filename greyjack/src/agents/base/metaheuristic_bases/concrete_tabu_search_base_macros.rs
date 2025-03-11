@@ -3,9 +3,9 @@
 #[macro_export]
 macro_rules! build_concrete_tabu_search_base {
 
-    ($tabu_variant_name:ident, $individual_variant:ident, $score_type:ty) => {
+    ($me_base_name: ident, $individual_variant: ident, $score_type: ty) => {
         #[pyclass]
-        pub struct $tabu_variant_name {
+        pub struct $me_base_name {
 
             pub neighbours_count: usize,
             pub tabu_entity_rate: f64,
@@ -19,7 +19,7 @@ macro_rules! build_concrete_tabu_search_base {
         }
 
         #[pymethods]
-        impl $tabu_variant_name {
+        impl $me_base_name {
 
             #[new]
             #[pyo3(signature = (variables_manager_py, neighbours_count, tabu_entity_rate, semantic_groups_map, mutation_rate_multiplier=None, move_probas=None, discrete_ids=None))]
@@ -54,16 +54,6 @@ macro_rules! build_concrete_tabu_search_base {
                     mover: Mover::new(tabu_entity_rate, HashMap::new(), HashMap::new(), HashMap::new(), group_mutation_rates_map, move_probas),
                     variables_manager: VariablesManager::new(variables_manager_py.variables_vec.clone())
                 }
-            }
-
-            #[getter]
-            pub fn metaheuristic_kind(&self) -> String {
-                self.metaheuristic_kind.clone()
-            }
-
-            #[getter]
-            pub fn metaheuristic_name(&self) -> String {
-                self.metaheuristic_name.clone()
             }
 
             fn sample_candidates_plain(
@@ -172,6 +162,16 @@ macro_rules! build_concrete_tabu_search_base {
                 }
 
                 return new_population;
+            }
+
+            #[getter]
+            pub fn metaheuristic_kind(&self) -> String {
+                self.metaheuristic_kind.clone()
+            }
+
+            #[getter]
+            pub fn metaheuristic_name(&self) -> String {
+                self.metaheuristic_name.clone()
             }
         }
     };

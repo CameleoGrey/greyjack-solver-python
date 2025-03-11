@@ -2,5 +2,6 @@
 
 pub mod mover;
 pub mod concrete_tabu_search_base_macros;
+pub mod concrete_genetic_algorithm_macros;
 
 pub use mover::Mover;
