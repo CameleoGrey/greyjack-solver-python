@@ -33,6 +33,10 @@ macro_rules! build_concrete_individual {
                 pub fn as_list(&self) -> Vec<Vec<f64>> {
                     vec![self.variable_values.clone(), self.score.as_list()]
                 }
+
+                pub fn copy(&self) -> Self {
+                    self.clone()
+                }
                 
                 #[staticmethod]
                 pub fn from_list(list_individual: Vec<Vec<f64>>) -> Self {

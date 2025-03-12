@@ -19,6 +19,8 @@ class GeneticAlgorithm(Agent):
         self.tabu_entity_rate = tabu_entity_rate
         self.mutation_rate_multiplier = mutation_rate_multiplier
         self.move_probas = move_probas
+        # Didn't check, in theory ruins island concept for genetic algorithm (better turn off)
+        self.is_win_from_comparing_with_global = False
 
     def _build_metaheuristic_base(self):
         self.score_requester = OOPScoreRequester(self.cotwin)
@@ -37,5 +39,9 @@ class GeneticAlgorithm(Agent):
             self.move_probas.copy() if self.move_probas else None,
             discrete_ids,
         )
+
+        # to remove redundant clonning
+        self.metaheuristic_name = self.metaheuristic_base.metaheuristic_name
+        self.metaheuristic_kind = self.metaheuristic_base.metaheuristic_kind
 
         return self

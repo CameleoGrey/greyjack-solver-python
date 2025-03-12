@@ -40,31 +40,38 @@ class Agent():
         self.migration_frequency = migration_frequency
         self.steps_to_send_updates = migration_frequency
         self.agent_status = "alive"
+        self.is_last_message_shown = False
         self.round_robin_status_dict = {}
         self.total_agents_count = None
 
-        # windows updates send/receive
+        # linux updates send/receive by Pipe (channels) mechanism (doesn't need ports binding, faster, simpler)
+        self.agent_to_agent_pipe_sender = None
+        self.agent_to_agent_pipe_receiver = None
+        self.agent_to_master_updates_sender = None
+        self.agent_from_master_updates_receiver = None
+        #self.master_publisher_queue = None
+        #self.master_subscriber_queue = None
+
+        # platform independent updates send/receive by sockets
         self.context = None
-        self.socket_request = None
-        self.socket_reply = None
-        self.socket_publisher = None
-        self.solver_master_address = None
-        self.current_agent_address = None
+        self.agent_to_agent_socket_sender = None
+        self.agent_to_agent_socket_receiver = None
+        self.agent_to_master_socket_publisher = None
+        self.master_subscriber_address = None
+        self.master_publisher_address = None
+        self.agent_address_for_other_agents = None
         self.next_agent_address = None
+        self.is_master_received_variables_info = False
 
-        # linux updates send/receive
-        self.updates_sender = None
-        self.updates_receiver = None
-        self.solver_updates_sender = None
 
-        self.is_windows = True if "win" in current_platform else False
+        self.is_linux = True if "linux" in current_platform else False
 
     def _build_logger(self):
 
         if self.logging_level is None:
             self.logging_level = "info"
-        if self.logging_level not in ["info", "trace", "warn"]:
-            raise Exception("logging_level must be in [\"info\", \"trace\", \"warn\"]")
+        if self.logging_level not in ["info", "trace", "warn", "fresh_only"]:
+            raise Exception("logging_level must be in [\"info\", \"trace\", \"warn\", \"fresh_only\"]")
         
         self.logger = logging.getLogger("logger_{}".format(self.agent_id))
         self.logger.setLevel(logging.INFO)
@@ -74,6 +81,22 @@ class Agent():
         self.logger.addHandler(handler)
 
         pass
+
+    def _build_sockets(self):
+        self.context = zmq.Context()
+        self.agent_to_agent_socket_sender = self.context.socket(zmq.REQ)
+        self.agent_to_agent_socket_receiver = self.context.socket(zmq.REP)
+        self.agent_to_agent_socket_receiver.bind( self.agent_address_for_other_agents )
+
+        self.agent_to_master_socket_publisher = self.context.socket(zmq.PUB)
+        self.agent_to_master_socket_publisher.connect(self.master_subscriber_address)
+
+        self.agent_to_master_subscriber_socket = self.context.socket(zmq.SUB)
+        self.agent_to_master_subscriber_socket.setsockopt_string(zmq.SUBSCRIBE, "")
+        # process only the most actual messages from agents (drop old messages)
+        self.agent_to_master_subscriber_socket.setsockopt(zmq.CONFLATE, 1)
+        self.agent_to_master_subscriber_socket.connect( self.master_publisher_address )
+
 
     def _build_cotwin(self):
         if self.initial_solution is None:
@@ -98,23 +121,14 @@ class Agent():
 
     def solve(self):
 
-        if self.is_windows:
-            self.context = zmq.Context()
-            self.socket_request = self.context.socket(zmq.REQ)
-            #self.socket_request.RCVTIMEO = 1000
-            self.socket_reply = self.context.socket(zmq.REP)
-            #self.socket_reply.RCVTIMEO = 1000
-            self.socket_reply.bind( self.current_agent_address )
-            self.socket_publisher = self.context.socket(zmq.PUB)
-            #self.socket_publisher.setsockopt(zmq.CONFLATE, 1)
-            self.socket_publisher.connect(self.solver_master_address)
-
         try:
+            if not self.is_linux:
+                self._build_sockets()
             self._build_cotwin()
             self._define_individual_type()
             self._build_metaheuristic_base()
             self._build_logger()
-            self.init_population()
+            self._init_population()
             self.population.sort()
             self.agent_top_individual = self.population[0]
 
@@ -126,14 +140,15 @@ class Agent():
             exit(-1)
 
         step_id = 0
+        start_time = time.perf_counter()
         while True:
-            start_time = time.perf_counter()
+            #start_step_time = time.perf_counter()
             try:
                 if self.agent_status == "alive":
                     if self.cotwin.score_calculator.is_incremental: 
-                        self.step_incremental()
+                        self._step_incremental()
                     else: 
-                        self.step_plain()
+                        self._step_plain()
             except Exception as e:
                 print(e)
                 exit(-1)
@@ -141,28 +156,36 @@ class Agent():
             try:
                 step_id += 1
                 self.population.sort()
-                self.agent_top_individual = self.population[0]
+                if self.population[0] < self.agent_top_individual:
+                    self.agent_top_individual = self.population[0].copy()
                 self.termination_strategy.update( self )
+                #step_time = time.perf_counter() - start_time
+                #print("step_time: {}".format(step_time))
                 total_time = time.perf_counter() - start_time
-                #print("total_step_time: {}".format(total_time))
-                if self.logging_level in ["trace"] and self.agent_status == "alive":
-                    self.logger.info(f"Agent: {self.agent_id} Step: {step_id} Global best: {self.agent_top_individual.score}, Step time: {total_time:.6f}")
+                if self.logging_level in ["info"] and self.agent_status == "alive":
+                    self.logger.info(f"Agent: {self.agent_id} Step: {step_id} Best score: {self.agent_top_individual.score}, Solving time: {total_time:.6f}")
 
                 if self.total_agents_count > 1:
                     self.steps_to_send_updates -= 1
                     if self.steps_to_send_updates <= 0:
-                        self.send_receive_updates()
+                        self._send_receive_updates()
 
                 if self.termination_strategy.is_accomplish():
                     self.agent_status = "dead"
                     self.round_robin_status_dict[self.agent_id] = self.agent_status
-                
-                self.send_candidate_to_master(step_id)
+                    if not self.is_last_message_shown:
+                        self.logger.info(f"Agent: {self.agent_id} has successfully terminated work. Now it's just transmitting updates between its neighbours until at least one agent is alive.")
+                        self.is_last_message_shown = True
+
+                self._send_candidate_to_master(step_id)
+
+                if self.is_win_from_comparing_with_global or (not self.is_master_received_variables_info):
+                    self._check_global_updates()
             except Exception as e:
                 print(e)
                 exit(-1)
     
-    def init_population(self):
+    def _init_population(self):
 
         self.population = []
         if not self.cotwin.score_calculator.is_incremental:
@@ -181,7 +204,7 @@ class Agent():
             scores = self.score_requester.request_score_incremental(generated_sample, deltas)
             self.population.append(self.individual_type(generated_sample, scores[0]))
 
-    def step_plain(self):
+    def _step_plain(self):
         new_population = []
         samples = self.metaheuristic_base.sample_candidates_plain(self.population, self.agent_top_individual)
         scores = self.score_requester.request_score_plain(samples)
@@ -194,7 +217,7 @@ class Agent():
 
         self.population = new_population
 
-    def step_incremental(self):
+    def _step_incremental(self):
         new_population = []
         sample, deltas = self.metaheuristic_base.sample_candidates_incremental(self.population, self.agent_top_individual)
         scores = self.score_requester.request_score_incremental(sample, deltas)
@@ -205,34 +228,34 @@ class Agent():
         new_population = self.metaheuristic_base.build_updated_population_incremental(self.population, sample, deltas, scores)
         self.population = new_population
 
-    def send_receive_updates(self):
-        if self.is_windows:
-            self._send_receive_updates_windows()
-        else:
+    def _send_receive_updates(self):
+        if self.is_linux:
             self._send_receive_updates_linux()
+        else:
+            self._send_receive_updates_universal()
 
-    def _send_receive_updates_windows(self):
+    def _send_receive_updates_universal(self):
         try:
             if int(self.agent_id) % 2 == 0:
-                self._send_updates_windows()
-                self._get_updates_windows()
+                self._send_updates_universal()
+                self._get_updates_universal()
             else:
-                self._get_updates_windows()
-                self._send_updates_windows()
+                self._get_updates_universal()
+                self._send_updates_universal()
             self.steps_to_send_updates = self.migration_frequency
         except Exception as e:
             self.logger.info("Agent {} failed to send/receive updates: {}".format(self.agent_id, e))
 
-    def _send_updates_windows(self):
+    def _send_updates_universal(self):
 
         ready_to_send_request = orjson.dumps( "ready to send updates" )
-        self.socket_request.connect(self.next_agent_address)
-        self.socket_request.send( ready_to_send_request )
+        self.agent_to_agent_socket_sender.connect(self.next_agent_address)
+        self.agent_to_agent_socket_sender.send( ready_to_send_request )
         #request_count_limit = 3
         #current_retries_count = 0
         while True:
-            if (self.socket_request.poll(100) & zmq.POLLIN) != 0:
-                reply = self.socket_request.recv()
+            if (self.agent_to_agent_socket_sender.poll(100) & zmq.POLLIN) != 0:
+                reply = self.agent_to_agent_socket_sender.recv()
                 if isinstance( reply, bytes ):
                     if self.logging_level in ["trace"]:
                         self.logger.info("Agent {} is ready to receive updates".format(orjson.loads(reply)))
@@ -267,38 +290,38 @@ class Agent():
 
         request_serialized = orjson.dumps(request)
         try:
-            self.socket_request.connect(self.next_agent_address)
-            self.socket_request.send( request_serialized )
-            reply = self.socket_request.recv()
+            self.agent_to_agent_socket_sender.connect(self.next_agent_address)
+            self.agent_to_agent_socket_sender.send( request_serialized )
+            reply = self.agent_to_agent_socket_sender.recv()
         except Exception as e:
-            if self.logging_level in ["warn", "trace", "info"]:
+            if self.logging_level in ["warn", "trace", "info", "fresh_only"]:
                 self.logger.error(e)
             return
         reply = orjson.loads( reply )
 
         return reply
 
-    def _get_updates_windows(self):
+    def _get_updates_universal(self):
 
         try:
-            request_for_sending_updates = self.socket_reply.recv()
+            request_for_sending_updates = self.agent_to_agent_socket_receiver.recv()
         except Exception as e:
-            if self.logging_level in ["warn", "trace", "info"]:
+            if self.logging_level in ["warn", "trace", "info", "fresh_only"]:
                 self.logger.error(e)
                 self.logger.error("failed to receive")
-            self.socket_reply.send(orjson.dumps("Failed to receive updates"))
+            self.agent_to_agent_socket_receiver.send(orjson.dumps("Failed to receive updates"))
             return
-        self.socket_reply.send(orjson.dumps("{}".format(self.agent_id)))
+        self.agent_to_agent_socket_receiver.send(orjson.dumps("{}".format(self.agent_id)))
 
         try:
-            updates_reply = self.socket_reply.recv()
+            updates_reply = self.agent_to_agent_socket_receiver.recv()
         except Exception as e:
-            if self.logging_level in ["warn", "trace", "info"]:
+            if self.logging_level in ["warn", "trace", "info", "fresh_only"]:
                 self.logger.error(e)
                 self.logger.error("failed to receive")
-            self.socket_reply.send(orjson.dumps("Failed to receive updates"))
+            self.agent_to_agent_socket_receiver.send(orjson.dumps("Failed to receive updates"))
             return
-        self.socket_reply.send(orjson.dumps("Successfully received updates"))
+        self.agent_to_agent_socket_receiver.send(orjson.dumps("Successfully received updates"))
         updates_reply = orjson.loads( updates_reply )
 
         if self.metaheuristic_base.metaheuristic_name == "LSHADE":
@@ -333,7 +356,7 @@ class Agent():
 
         pass
 
-    def _send_receive_updates_lixux(self):
+    def _send_receive_updates_linux(self):
         try:
             if int(self.agent_id) % 2 == 0:
                 self._send_updates_linux()
@@ -370,10 +393,10 @@ class Agent():
                 request["history_archive"] = None
 
         try:
-            self.updates_sender.send( request )
-            reply = self.updates_sender.recv()
+            self.agent_to_agent_pipe_sender.send( request )
+            reply = self.agent_to_agent_pipe_sender.recv()
         except Exception as e:
-            if self.logging_level in ["warn", "trace", "info"]:
+            if self.logging_level in ["warn", "trace", "info", "fresh_only"]:
                 self.logger.error(e)
             return
 
@@ -382,14 +405,14 @@ class Agent():
     def _get_updates_linux(self):
 
         try:
-            updates_reply = self.updates_receiver.recv()
+            updates_reply = self.agent_to_agent_pipe_receiver.recv()
         except Exception as e:
-            if self.logging_level in ["warn", "trace", "info"]:
+            if self.logging_level in ["warn", "trace", "info", "fresh_only"]:
                 self.logger.error(e)
                 self.logger.error("failed to receive")
-            self.updates_receiver.send("Failed to receive updates")
+            self.agent_to_agent_pipe_receiver.send("Failed to receive updates")
             return
-        self.updates_receiver.send("Successfully received updates")
+        self.agent_to_agent_pipe_receiver.send("Successfully received updates")
 
         if self.metaheuristic_base.metaheuristic_name == "LSHADE":
             history_migrant = updates_reply["history_archive"]
@@ -423,27 +446,73 @@ class Agent():
 
         pass
 
-    def send_candidate_to_master(self, step_id):
-        if self.is_windows:
-                self.send_candidate_to_master_windows(step_id)
+    def _send_candidate_to_master(self, step_id):
+        if self.is_linux:
+            self._send_candidate_to_master_linux(step_id)
         else:
-            self.send_candidate_to_master_linux(step_id)
+            self._send_candidate_to_master_universal(step_id)
 
-    def send_candidate_to_master_windows(self, step_id):
+    def _send_candidate_to_master_universal(self, step_id):
         agent_publication = {}
         agent_publication["agent_id"] = self.agent_id
         agent_publication["status"] = self.agent_status
         agent_publication["candidate"] = self.agent_top_individual.as_list()
         agent_publication["step"] = step_id
         agent_publication["score_variant"] = self.score_variant
+        if self.is_master_received_variables_info:
+            agent_publication["variable_names"] = None
+            agent_publication["discrete_ids"] = None
+        else:
+            agent_publication["variable_names"] = self.score_requester.variables_manager.get_variables_names_vec()
+            agent_publication["discrete_ids"] = self.score_requester.variables_manager.discrete_ids
         agent_publication = orjson.dumps( agent_publication )
-        self.socket_publisher.send( agent_publication )
+        self.agent_to_master_socket_publisher.send( agent_publication )
 
-    def send_candidate_to_master_linux(self, step_id):
+    def _send_candidate_to_master_linux(self, step_id):
         agent_publication = {}
         agent_publication["agent_id"] = self.agent_id
         agent_publication["status"] = self.agent_status
         agent_publication["candidate"] = self.agent_top_individual.as_list()
         agent_publication["step"] = step_id
         agent_publication["score_variant"] = self.score_variant
-        self.socket_publisher.send( agent_publication )
+        if self.is_master_received_variables_info:
+            agent_publication["variable_names"] = None
+            agent_publication["discrete_ids"] = None
+        else:
+            agent_publication["variable_names"] = self.score_requester.variables_manager.get_variables_names_vec()
+            agent_publication["discrete_ids"] = self.score_requester.variables_manager.discrete_ids
+        self.agent_to_master_updates_sender.send( agent_publication )
+
+    def _check_global_updates(self):
+        if self.is_linux:
+            self._check_global_updates_linux()
+        else:
+            self._check_global_updates_universal()
+    
+    def _check_global_updates_linux(self):
+        master_publication = self.agent_from_master_updates_receiver.recv()
+
+        if self.is_win_from_comparing_with_global:
+            global_top_individual = master_publication[0]
+            global_top_individual = Individual.get_related_individual_type(self.score_variant).from_list(global_top_individual)
+            if global_top_individual < self.agent_top_individual:
+                self.agent_top_individual = global_top_individual
+                self.population[0] = global_top_individual.copy()
+        
+        is_variable_names_received = master_publication[1]
+        self.is_master_received_variables_info = is_variable_names_received
+
+
+    def _check_global_updates_universal(self):
+        master_publication = self.agent_to_master_subscriber_socket.recv()
+        master_publication = orjson.loads(master_publication)
+
+        if self.is_win_from_comparing_with_global:
+            global_top_individual = master_publication[0]
+            global_top_individual = Individual.get_related_individual_type(self.score_variant).from_list(global_top_individual)
+            if global_top_individual < self.agent_top_individual:
+                self.agent_top_individual = global_top_individual
+                self.population[0] = global_top_individual.copy()
+        
+        is_variable_names_received = master_publication[1]
+        self.is_master_received_variables_info = is_variable_names_received

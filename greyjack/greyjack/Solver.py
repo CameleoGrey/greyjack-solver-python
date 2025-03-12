@@ -5,12 +5,10 @@ import random
 
 from greyjack.agents.base.GJSolution import GJSolution
 from greyjack.agents.base.individuals.Individual import Individual
-# TODO: create comparing with global top mechanism like in Rust version (by Queue/SimpleQueue for Linux, ZMQ PUB/SUB for other platforms)
-#from greyjack.agents.LateAcceptance import LateAcceptance
 from pathos.multiprocessing import ProcessPool
 from pathos.threading import ThreadPool
 import multiprocessing
-from multiprocessing import Pipe
+from multiprocessing import Pipe, SimpleQueue
 from copy import deepcopy
 import logging
 import zmq
@@ -28,11 +26,10 @@ class Solver():
                  initial_solution = None):
         
         """
-        "available_ports" and "default_port" are ignoring on Linux.
-        On Windows interprocessing communication is organized by ZMQ, because of "spawn" process creation (needs to bind n_jobs + 1 ports).
-        On Linux GreyJack uses Pipes and "fork" mechanism. That's why, you don't need to bind additional ports
-        inside Docker container or some Linux VM (useful (and moreover needful) in production environment).
-        Windows version of GreyJack is useful for prototyping and keeps universality of solver (keeps possibility for using on Windows).
+        "available_ports" and "default_port" are ignoring on Linux because of using Pipe (channels) mechanism.
+        For other platforms ZMQ sockets are used to keep possibility of using Solver on other platforms.
+        Excluding redundant ports binding is neccessary for production environments (usually docker images are using Linux distributions), 
+        but not important for prototyping (on Windows, for example). 
 
         parallelization_backend = "threading" for debugging
         parallelization_backend = "processing" for production
@@ -49,24 +46,30 @@ class Solver():
         self.default_port = default_port
         self.initial_solution = initial_solution
 
+        self.global_top_individual = None
+        self.global_top_solution = None
+        self.variable_names = None
+        self.discrete_ids = None
+        self.is_variables_info_received = False
+        self.is_agent_wins_from_comparing_with_global = agent.is_win_from_comparing_with_global
         self.agent_statuses = {}
         self.observers = []
 
-        self.is_windows = True if "win" in current_platform else False
+        self.is_linux = True if "linux" in current_platform else False
 
         self._build_logger()
-        if self.is_windows:
-            self._init_agents_available_addresses_and_ports()
-        else:
+        if self.is_linux:
             self._init_master_solver_pipe()
+        else:
+            self._init_agents_available_addresses_and_ports()
 
     
     def _build_logger(self):
 
         if self.logging_level is None:
             self.logging_level = "info"
-        if self.logging_level not in ["info", "trace", "warn"]:
-            raise Exception("logging_level must be in [\"info\", \"trace\", \"warn\"]")
+        if self.logging_level not in ["info", "trace", "warn", "fresh_only"]:
+            raise Exception("logging_level must be in [\"info\", \"trace\", \"warn\", \"fresh_only\"]")
         
         self.logger = logging.getLogger("logger")
         self.logger.setLevel(logging.INFO)
@@ -78,7 +81,7 @@ class Solver():
         pass
 
     def _init_agents_available_addresses_and_ports(self):
-        minimal_ports_count_required = self.n_jobs + 1
+        minimal_ports_count_required = self.n_jobs + 2
         if self.available_ports is not None:
             available_ports_count = len(self.available_ports)
             if available_ports_count < minimal_ports_count_required:
@@ -88,26 +91,35 @@ class Solver():
             self.available_ports = [str(int(self.default_port) + i) for i in range(minimal_ports_count_required)]
         
         self.address = "localhost"
-        self.port = self.available_ports[0]
-        self.full_address = "tcp://{}:{}".format(self.address, self.port)
+        self.master_subscriber_address = "tcp://{}:{}".format(self.address, self.available_ports[0])
         self.context = zmq.Context()
-        self.socket = self.context.socket(zmq.SUB)
-        self.socket.setsockopt_string(zmq.SUBSCRIBE, "")
+        self.master_to_agents_subscriber_socket = self.context.socket(zmq.SUB)
+        self.master_to_agents_subscriber_socket.setsockopt_string(zmq.SUBSCRIBE, "")
         # process only the most actual messages from agents (drop old messages)
-        self.socket.setsockopt(zmq.CONFLATE, 1)
-        self.socket.bind( self.full_address )
+        self.master_to_agents_subscriber_socket.setsockopt(zmq.CONFLATE, 1)
+        self.master_to_agents_subscriber_socket.bind( self.master_subscriber_address )
 
-        current_port_id = 1
-        available_agent_ports = [self.available_ports[current_port_id + i] for i in range(self.n_jobs)]
-        self.available_agent_ports = available_agent_ports
-        self.available_agent_addresses = ["localhost" for i in range(self.n_jobs)]
+        self.master_publisher_address = "tcp://{}:{}".format(self.address, self.available_ports[1])
+        self.master_to_agents_publisher_socket = self.context.socket(zmq.PUB)
+        self.master_to_agents_publisher_socket.bind( self.master_publisher_address )
+
+        current_port_id = 2
+        available_agent_to_agent_ports = [self.available_ports[current_port_id + i] for i in range(self.n_jobs)]
+        self.available_agent_to_agent_ports = available_agent_to_agent_ports
+        self.available_agent_to_agent_addresses = ["localhost" for i in range(self.n_jobs)]
 
         pass
 
     def _init_master_solver_pipe(self):
-        solver_updates_sender, solver_updates_receiver = Pipe()
-        self.solver_updates_receiver = solver_updates_receiver
-        self.solver_updates_sender = solver_updates_sender
+        agent_to_master_updates_sender, master_from_agent_updates_receiver = Pipe()
+        self.agent_to_master_updates_sender = agent_to_master_updates_sender
+        self.master_from_agent_updates_receiver = master_from_agent_updates_receiver
+        master_to_agent_updates_sender, agent_from_master_updates_receiver = Pipe()
+        self.master_to_agent_updates_sender = master_to_agent_updates_sender
+        self.agent_from_master_updates_receiver = agent_from_master_updates_receiver
+
+        #self.master_publisher_queue = SimpleQueue()
+        #self.master_subscriber_queue = SimpleQueue()
 
 
     def solve(self):
@@ -117,37 +129,26 @@ class Solver():
 
         start_time = time.perf_counter()
         steps_count = 0
-        global_top_individual = None
         while True:
 
-            if self.is_windows:
-                agent_publication = self.socket.recv()
-                agent_publication = orjson.loads(agent_publication)
-            else:
-                agent_publication = self.solver_updates_receiver.recv()
-            agent_id = agent_publication["agent_id"]
-            agent_status = agent_publication["status"]
-            local_step = agent_publication["step"]
-            score_variant = agent_publication["score_variant"]
-            received_individual = agent_publication["candidate"]
-            received_individual = Individual.get_related_individual_type_by_value(score_variant).from_list(received_individual)
-
+            received_individual, agent_id, agent_status, local_step = self.receive_agent_publication()
             new_best_flag = False
-            if global_top_individual is None:
-                global_top_individual = received_individual
-            elif received_individual < global_top_individual:
-                global_top_individual = received_individual
+            if self.global_top_individual is None:
+                self.global_top_individual = received_individual
+            elif received_individual < self.global_top_individual:
+                self.global_top_individual = received_individual
+                self.update_global_top_solution()
                 new_best_flag = True
+            self.send_global_update()
+
             total_time = time.perf_counter() - start_time
             steps_count += 1
             new_best_string = "New best score!" if new_best_flag else ""
-            if self.logging_level == "trace":
-                self.logger.info(f"Solutions received: {steps_count} Best score: {global_top_individual.score}, Solving time: {total_time:.6f}, {new_best_string}, Current (agent: {agent_id}, status: {agent_status}, local_step: {local_step}): {received_individual.score}")
-            elif self.logging_level == "info":
-                self.logger.info(f"Solutions received: {steps_count} Best score: {global_top_individual.score}, Solving time: {total_time:.6f} {new_best_string}")
+            if self.logging_level == "fresh_only" and new_best_flag:
+                self.logger.info(f"Solutions received: {steps_count} Best score: {self.global_top_individual.score}, Solving time: {total_time:.6f} {new_best_string}")
 
             if len(self.observers) >= 1:
-                self._notify_observers(global_top_individual)
+                self._notify_observers(self.global_top_individual)
 
             self.agent_statuses[agent_id] = agent_status
             someone_alive = False
@@ -160,12 +161,11 @@ class Solver():
             if someone_alive is False:
                 agents_process_pool.terminate()
                 agents_process_pool.close()
-                agents_process_pool.join()
                 del agents_process_pool
                 gc.collect()
                 break
 
-        return global_top_individual     
+        return self.global_top_solution     
 
     def _run_jobs(self, agents):
         def run_agent_solving(agent):
@@ -199,43 +199,76 @@ class Solver():
             for j in range(self.n_jobs):
                 agents[i].round_robin_status_dict[agents[j].agent_id] = deepcopy(agents[i].agent_status)
 
-        if self.is_windows:
-            for i in range(self.n_jobs):
-                agents[i].solver_master_address = deepcopy(self.full_address)
-                agents[i].current_agent_address = deepcopy("tcp://{}:{}".format(self.available_agent_addresses[i], self.available_agent_ports[i]))
-
-            for i in range(self.n_jobs):
-                next_agent_id = (i + 1) % self.n_jobs
-                agents[i].next_agent_address = deepcopy(agents[next_agent_id].current_agent_address)
-        else:
+        if self.is_linux:
             agents_updates_senders = []
             agents_updates_receivers = []
             for i in range(self.n_jobs):
-                updates_sender, updates_receiver = Pipe()
-                agents_updates_senders.append(updates_sender)
-                agents_updates_receivers.append(updates_receiver)
+                agent_to_agent_pipe_sender, agent_to_agent_pipe_receiver = Pipe()
+                agents_updates_senders.append(agent_to_agent_pipe_sender)
+                agents_updates_receivers.append(agent_to_agent_pipe_receiver)
             agents_updates_receivers.append(agents_updates_receivers.pop(0))
-
             for i in range(self.n_jobs):
-                agents[i].updates_sender = agents_updates_senders[i]
-                agents[i].updates_receiver = agents_updates_receivers[i]
-                agents[i].solver_master_sender = deepcopy(self.solver_updates_sender)
+                agents[i].agent_to_agent_pipe_sender = agents_updates_senders[i]
+                agents[i].agent_to_agent_pipe_receiver = agents_updates_receivers[i]
+                agents[i].agent_to_master_updates_sender = self.agent_to_master_updates_sender
+                agents[i].agent_from_master_updates_receiver = self.agent_from_master_updates_receiver
+                #agents[i].master_publisher_queue = self.master_publisher_queue
+                #agents[i].master_subscriber_queue = self.master_subscriber_queue
+            
+        else:
+            for i in range(self.n_jobs):
+                agents[i].agent_address_for_other_agents = deepcopy("tcp://{}:{}".format(self.available_agent_to_agent_addresses[i], self.available_agent_to_agent_ports[i]))
+                agents[i].master_subscriber_address = deepcopy(self.master_subscriber_address)
+                agents[i].master_publisher_address = deepcopy(self.master_publisher_address)
+            for i in range(self.n_jobs):
+                next_agent_id = (i + 1) % self.n_jobs
+                agents[i].next_agent_address = deepcopy(agents[next_agent_id].agent_address_for_other_agents)
 
         return agents
 
-    """def _build_gjsolution_from_individual(self, individual):
-        variables_dict = self.score_requesters[0].variables_manager.inverse_transform_variables(individual.transformed_values)
-        solution_score = individual.score
-        gjsolution = GJSolution(variables_dict, solution_score)
-        return gjsolution
+    def receive_agent_publication(self):
+        if self.is_linux:
+            agent_publication = self.master_from_agent_updates_receiver.recv()
+        else:
+            agent_publication = self.master_to_agents_subscriber_socket.recv()
+            agent_publication = orjson.loads(agent_publication)
+        agent_id = agent_publication["agent_id"]
+        agent_status = agent_publication["status"]
+        local_step = agent_publication["step"]
+        score_variant = agent_publication["score_variant"]
+        received_individual = agent_publication["candidate"]
+        received_individual = Individual.get_related_individual_type_by_value(score_variant).from_list(received_individual)
+        if not self.is_variables_info_received:
+            self.variable_names = agent_publication["variable_names"]
+            self.discrete_ids = agent_publication["discrete_ids"]
+            self.is_variables_info_received = True
+
+        return received_individual, agent_id, agent_status, local_step
+
+    def send_global_update(self):
+
+        if self.is_agent_wins_from_comparing_with_global:
+            master_publication = [self.global_top_individual.as_list(), self.is_variables_info_received]
+        else:
+            master_publication = [None, self.is_variables_info_received]
+
+        if not self.is_linux:
+            master_publication = orjson.dumps(master_publication)
+            self.master_to_agents_publisher_socket.send( master_publication )
+        else:
+            self.master_to_agent_updates_sender.send(master_publication)
+
+    def update_global_top_solution(self):
+        individual_list = self.global_top_individual.as_list()
+        self.global_top_solution = GJSolution(self.variable_names, self.discrete_ids, individual_list[0], individual_list[1], self.score_precision)
+        pass
 
     
     def register_observer(self, observer):
         self.observers.append(observer)
         pass
 
-    def _notify_observers(self, solution_update):
-        gjsolution = self._build_gjsolution_from_individual(solution_update)
+    def _notify_observers(self):
         for observer in self.observers:
-            observer.update_solution(gjsolution)
-        pass"""
+            observer.update_solution(self.global_top_solution)
+        pass
