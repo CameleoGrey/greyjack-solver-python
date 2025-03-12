@@ -23,10 +23,16 @@ class LateAcceptance(Agent):
         self.move_probas = move_probas
         self.is_win_from_comparing_with_global = True # Much faster convergence without stucking in local optimums (with high migration frequency)
 
+        # to remove redundant clonning
+        self.variable_names = None
+        self.discrete_ids = None
+
+
     def _build_metaheuristic_base(self):
         self.score_requester = OOPScoreRequester(self.cotwin)
         semantic_groups_dict = self.score_requester.variables_manager.semantic_groups_map.copy()
-        discrete_ids = self.score_requester.variables_manager.discrete_ids.copy()
+        self.variable_names = self.score_requester.variables_manager.get_variables_names_vec()
+        self.discrete_ids = self.score_requester.variables_manager.discrete_ids.copy()
 
         self.metaheuristic_base = LateAcceptanceBase.new(
             self.cotwin.score_calculator.score_variant,
@@ -36,7 +42,7 @@ class LateAcceptance(Agent):
             semantic_groups_dict,
             self.mutation_rate_multiplier,
             self.move_probas.copy() if self.move_probas else None,
-            discrete_ids,
+            self.discrete_ids,
         )
 
         # to remove redundant clonning

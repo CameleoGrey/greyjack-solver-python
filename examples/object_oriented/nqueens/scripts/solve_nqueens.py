@@ -39,7 +39,7 @@ if __name__ == "__main__":
                            migration_frequency=10, termination_strategy=termination_strategy)"""
 
     solver = Solver(domain_builder, cotwin_builder, agent, 
-                    n_jobs=10, parallelization_backend="processing", #processing, threading 
+                    n_jobs=2, parallelization_backend="processing", #processing, threading 
                     score_precision=[0], logging_level="info")
     solution = solver.solve()
     print( "Cotwin solution looks that: " )

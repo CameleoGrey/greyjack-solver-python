@@ -43,9 +43,8 @@ class PlainScoreCalculator:
     def remove_prescoring_function(self, function_name):
         if function_name in self.prescoring_functions:
             del self.prescoring_functions[function_name]
-
-    def get_score(self, planning_entity_dfs, problem_fact_dfs):
-
+    
+    def _setup_score_type(self):
         if self.score_variant is None:
             raise Exception("score_variant in PlainScoreCalculator is None. Set the score variant inside score calculator class. Warning! Use the same related score type inside all constraints.")
         else:
@@ -55,6 +54,10 @@ class PlainScoreCalculator:
                 self.score_type = HardSoftScore
             if self.score_variant == ScoreVariants.HardMediumSoftScore:
                 self.score_type = HardMediumSoftScore
+
+    def get_score(self, planning_entity_dfs, problem_fact_dfs):
+
+        self._setup_score_type()
 
         for prescoring_function in self.prescoring_functions.values():
             prescoring_function(planning_entity_dfs, problem_fact_dfs)

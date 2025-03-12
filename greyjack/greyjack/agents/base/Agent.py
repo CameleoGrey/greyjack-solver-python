@@ -11,6 +11,7 @@ from greyjack.agents.termination_strategies import *
 from greyjack.score_calculation.score_requesters import OOPScoreRequester
 from greyjack.score_calculation.score_calculators import PlainScoreCalculator, IncrementalScoreCalculator
 from greyjack.agents.base.individuals.Individual import Individual
+from greyjack.agents.base.GJSolution import GJSolution
 
 current_platform = sys.platform
 
@@ -39,30 +40,25 @@ class Agent():
         self.migration_rate = migration_rate
         self.migration_frequency = migration_frequency
         self.steps_to_send_updates = migration_frequency
-        self.agent_status = "alive"
+        self.is_alive = True
         self.is_last_message_shown = False
-        self.round_robin_status_dict = {}
         self.total_agents_count = None
 
         # linux updates send/receive by Pipe (channels) mechanism (doesn't need ports binding, faster, simpler)
         self.agent_to_agent_pipe_sender = None
         self.agent_to_agent_pipe_receiver = None
-        self.agent_to_master_updates_sender = None
-        self.agent_from_master_updates_receiver = None
-        #self.master_publisher_queue = None
-        #self.master_subscriber_queue = None
 
         # platform independent updates send/receive by sockets
         self.context = None
         self.agent_to_agent_socket_sender = None
         self.agent_to_agent_socket_receiver = None
-        self.agent_to_master_socket_publisher = None
-        self.master_subscriber_address = None
-        self.master_publisher_address = None
         self.agent_address_for_other_agents = None
         self.next_agent_address = None
-        self.is_master_received_variables_info = False
 
+        self.variables_count = None
+        self.score_len = None
+        self.shared_individual = None
+        self.shared_round_robin_status = None
 
         self.is_linux = True if "linux" in current_platform else False
 
@@ -87,16 +83,6 @@ class Agent():
         self.agent_to_agent_socket_sender = self.context.socket(zmq.REQ)
         self.agent_to_agent_socket_receiver = self.context.socket(zmq.REP)
         self.agent_to_agent_socket_receiver.bind( self.agent_address_for_other_agents )
-
-        self.agent_to_master_socket_publisher = self.context.socket(zmq.PUB)
-        self.agent_to_master_socket_publisher.connect(self.master_subscriber_address)
-
-        self.agent_to_master_subscriber_socket = self.context.socket(zmq.SUB)
-        self.agent_to_master_subscriber_socket.setsockopt_string(zmq.SUBSCRIBE, "")
-        # process only the most actual messages from agents (drop old messages)
-        self.agent_to_master_subscriber_socket.setsockopt(zmq.CONFLATE, 1)
-        self.agent_to_master_subscriber_socket.connect( self.master_publisher_address )
-
 
     def _build_cotwin(self):
         if self.initial_solution is None:
@@ -132,7 +118,7 @@ class Agent():
             self.population.sort()
             self.agent_top_individual = self.population[0]
 
-            self.agent_status = "alive"
+            self.is_alive = True
             self.steps_to_send_updates = self.migration_frequency
             self.termination_strategy.update( self )
         except Exception as e:
@@ -144,7 +130,7 @@ class Agent():
         while True:
             #start_step_time = time.perf_counter()
             try:
-                if self.agent_status == "alive":
+                if self.is_alive:
                     if self.cotwin.score_calculator.is_incremental: 
                         self._step_incremental()
                     else: 
@@ -158,11 +144,11 @@ class Agent():
                 self.population.sort()
                 if self.population[0] < self.agent_top_individual:
                     self.agent_top_individual = self.population[0].copy()
+                
+
                 self.termination_strategy.update( self )
-                #step_time = time.perf_counter() - start_time
-                #print("step_time: {}".format(step_time))
                 total_time = time.perf_counter() - start_time
-                if self.logging_level in ["info"] and self.agent_status == "alive":
+                if self.logging_level in ["info"] and self.is_alive:
                     self.logger.info(f"Agent: {self.agent_id} Step: {step_id} Best score: {self.agent_top_individual.score}, Solving time: {total_time:.6f}")
 
                 if self.total_agents_count > 1:
@@ -171,16 +157,27 @@ class Agent():
                         self._send_receive_updates()
 
                 if self.termination_strategy.is_accomplish():
-                    self.agent_status = "dead"
-                    self.round_robin_status_dict[self.agent_id] = self.agent_status
+                    self.is_alive = False
+                    self.shared_round_robin_status[self.agent_id] = self.is_alive
                     if not self.is_last_message_shown:
                         self.logger.info(f"Agent: {self.agent_id} has successfully terminated work. Now it's just transmitting updates between its neighbours until at least one agent is alive.")
                         self.is_last_message_shown = True
 
-                self._send_candidate_to_master(step_id)
 
-                if self.is_win_from_comparing_with_global or (not self.is_master_received_variables_info):
-                    self._check_global_updates()
+                #update_global_top_individual()
+                global_top_individual = [self.shared_individual[:self.variables_count], self.shared_individual[self.variables_count:]]
+                global_top_individual = Individual.get_related_individual_type(self.score_variant).from_list(global_top_individual)
+                if self.agent_top_individual < global_top_individual:
+                    agent_individual_list = self.agent_top_individual.as_list()
+                    agent_individual_list = agent_individual_list[0] + agent_individual_list[1]
+                    # if without slicing, I suggest, it will replace shared object by local object
+                    self.shared_individual[::] = agent_individual_list[::]
+
+                if self.is_win_from_comparing_with_global:
+                    if global_top_individual < self.agent_top_individual:
+                        self.agent_top_individual = global_top_individual
+                        self.population[0] = global_top_individual.copy()
+                
             except Exception as e:
                 print(e)
                 exit(-1)
@@ -277,7 +274,6 @@ class Agent():
         migrants = self.population[:migrants_count]
         migrants = self.individual_type.convert_individuals_to_lists(migrants)
         request = {"agent_id": self.agent_id, 
-                   "round_robin_status_dict": self.round_robin_status_dict,
                    "request_type": "put_updates", 
                    "migrants": migrants}
         if self.metaheuristic_base.metaheuristic_name == "LSHADE":
@@ -351,9 +347,6 @@ class Agent():
         else:
             raise Exception("metaheuristic_kind can be only Population or LocalSearch")
 
-        self.round_robin_status_dict = updates_reply["round_robin_status_dict"]
-        self.round_robin_status_dict[self.agent_id] = self.agent_status
-
         pass
 
     def _send_receive_updates_linux(self):
@@ -381,7 +374,6 @@ class Agent():
         migrants = self.population[:migrants_count]
         migrants = self.individual_type.convert_individuals_to_lists(migrants)
         request = {"agent_id": self.agent_id, 
-                   "round_robin_status_dict": self.round_robin_status_dict,
                    "request_type": "put_updates", 
                    "migrants": migrants}
         if self.metaheuristic_base.metaheuristic_name == "LSHADE":
@@ -440,79 +432,19 @@ class Agent():
             self.population[:n_migrants] = updated_tail
         else:
             raise Exception("metaheuristic_kind can be only Population or LocalSearch")
-
-        self.round_robin_status_dict = updates_reply["round_robin_status_dict"]
-        self.round_robin_status_dict[self.agent_id] = self.agent_status
-
         pass
-
-    def _send_candidate_to_master(self, step_id):
-        if self.is_linux:
-            self._send_candidate_to_master_linux(step_id)
-        else:
-            self._send_candidate_to_master_universal(step_id)
-
-    def _send_candidate_to_master_universal(self, step_id):
-        agent_publication = {}
-        agent_publication["agent_id"] = self.agent_id
-        agent_publication["status"] = self.agent_status
-        agent_publication["candidate"] = self.agent_top_individual.as_list()
-        agent_publication["step"] = step_id
-        agent_publication["score_variant"] = self.score_variant
-        if self.is_master_received_variables_info:
-            agent_publication["variable_names"] = None
-            agent_publication["discrete_ids"] = None
-        else:
-            agent_publication["variable_names"] = self.score_requester.variables_manager.get_variables_names_vec()
-            agent_publication["discrete_ids"] = self.score_requester.variables_manager.discrete_ids
-        agent_publication = orjson.dumps( agent_publication )
-        self.agent_to_master_socket_publisher.send( agent_publication )
-
-    def _send_candidate_to_master_linux(self, step_id):
-        agent_publication = {}
-        agent_publication["agent_id"] = self.agent_id
-        agent_publication["status"] = self.agent_status
-        agent_publication["candidate"] = self.agent_top_individual.as_list()
-        agent_publication["step"] = step_id
-        agent_publication["score_variant"] = self.score_variant
-        if self.is_master_received_variables_info:
-            agent_publication["variable_names"] = None
-            agent_publication["discrete_ids"] = None
-        else:
-            agent_publication["variable_names"] = self.score_requester.variables_manager.get_variables_names_vec()
-            agent_publication["discrete_ids"] = self.score_requester.variables_manager.discrete_ids
-        self.agent_to_master_updates_sender.send( agent_publication )
-
-    def _check_global_updates(self):
-        if self.is_linux:
-            self._check_global_updates_linux()
-        else:
-            self._check_global_updates_universal()
     
-    def _check_global_updates_linux(self):
-        master_publication = self.agent_from_master_updates_receiver.recv()
+    def _notify_observers(self):
 
-        if self.is_win_from_comparing_with_global:
-            global_top_individual = master_publication[0]
-            global_top_individual = Individual.get_related_individual_type(self.score_variant).from_list(global_top_individual)
-            if global_top_individual < self.agent_top_individual:
-                self.agent_top_individual = global_top_individual
-                self.population[0] = global_top_individual.copy()
-        
-        is_variable_names_received = master_publication[1]
-        self.is_master_received_variables_info = is_variable_names_received
+        agent_top_individual_list = self.agent_top_individual.as_list()
+        agent_top_solution = GJSolution(
+            self.variable_names, 
+            self.discrete_ids, 
+            agent_top_individual_list[0], 
+            agent_top_individual_list[1], 
+            self.score_precision
+            )
 
-
-    def _check_global_updates_universal(self):
-        master_publication = self.agent_to_master_subscriber_socket.recv()
-        master_publication = orjson.loads(master_publication)
-
-        if self.is_win_from_comparing_with_global:
-            global_top_individual = master_publication[0]
-            global_top_individual = Individual.get_related_individual_type(self.score_variant).from_list(global_top_individual)
-            if global_top_individual < self.agent_top_individual:
-                self.agent_top_individual = global_top_individual
-                self.population[0] = global_top_individual.copy()
-        
-        is_variable_names_received = master_publication[1]
-        self.is_master_received_variables_info = is_variable_names_received
+        for observer in self.observers:
+            observer.update_solution(agent_top_solution)
+        pass
