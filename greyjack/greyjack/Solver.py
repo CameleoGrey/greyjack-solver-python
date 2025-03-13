@@ -3,6 +3,8 @@ import orjson
 import time
 import random
 
+from greyjack.agents.base.LoggingLevel import LoggingLevel
+from greyjack.agents.base.ParallelizationBackend import ParallelizationBackend
 from greyjack.agents.base.GJSolution import GJSolution
 from greyjack.agents.base.individuals.Individual import Individual
 from pathos.multiprocessing import ProcessPool
@@ -20,19 +22,24 @@ current_platform = sys.platform
 class Solver():
 
     def __init__(self, domain_builder, cotwin_builder, agent,
-                 n_jobs=None, parallelization_backend="processing",
-                 score_precision=None, logging_level=None,
+                 parallelization_backend=ParallelizationBackend.Multiprocessing, 
+                 logging_level=LoggingLevel.Info, 
+                 n_jobs=None, score_precision=None,
                  available_ports=None, default_port="25000",
                  initial_solution = None):
         
         """
-        "available_ports" and "default_port" are ignoring on Linux because of using Pipe (channels) mechanism.
-        For other platforms ZMQ sockets are used to keep possibility of using Solver on other platforms.
-        Excluding redundant ports binding is neccessary for production environments (usually docker images are using Linux distributions), 
-        but not important for prototyping (on Windows, for example). 
+        On Linux platform solver needs 2 ports to bind.
+        On other platforms n_agents + 2.
+        All ports are binding to localhost. 
 
-        parallelization_backend = "threading" for debugging
-        parallelization_backend = "processing" for production
+        TODO:
+        Create and run 2 Docker containers, that will bind same internal (localhost) ports.
+        Will them work simultaneously or someone (both) fall down?
+        In theory, containers have theyr own network spaces.
+        If Docker can bind the same ports of localhost in different containers
+        for internal interprocess communication, then I don't need to care
+        about internally binded ports count (only about exposed on the level of API facade).
         """
         
         self.domain_builder = domain_builder
@@ -58,6 +65,7 @@ class Solver():
         self.is_linux = True if "linux" in current_platform else False
 
         self._build_logger()
+        self._init_master_pub_sub()
         if self.is_linux:
             self._init_master_solver_pipe()
         else:
@@ -67,9 +75,9 @@ class Solver():
     def _build_logger(self):
 
         if self.logging_level is None:
-            self.logging_level = "info"
-        if self.logging_level not in ["info", "trace", "warn", "fresh_only"]:
-            raise Exception("logging_level must be in [\"info\", \"trace\", \"warn\", \"fresh_only\"]")
+            self.logging_level = LoggingLevel.Info
+        if self.logging_level not in [LoggingLevel.FreshOnly, LoggingLevel.Info, LoggingLevel.Warn]:
+            raise Exception("logging_level must be value of LoggingLevel enum from greyjack.agents.base module")
         
         self.logger = logging.getLogger("logger")
         self.logger.setLevel(logging.INFO)
@@ -80,14 +88,17 @@ class Solver():
 
         pass
 
-    def _init_agents_available_addresses_and_ports(self):
-        minimal_ports_count_required = self.n_jobs + 2
+    def _init_master_pub_sub(self):
+
+        minimal_ports_count_required = 2
         if self.available_ports is not None:
             available_ports_count = len(self.available_ports)
             if available_ports_count < minimal_ports_count_required:
-                exception_string = "For {} agents required at least {} available ports. Set available_ports list manually or set it None for auto allocation".format(self.n_jobs, minimal_ports_count_required)
+                exception_string = "Required at least {} available ports for master node to share global state between agents. Set available_ports list manually or set it None for auto allocation".format(self.n_jobs, minimal_ports_count_required)
                 raise Exception(exception_string)
         else:
+            if not self.is_linux:
+                minimal_ports_count_required += self.n_jobs
             self.available_ports = [str(int(self.default_port) + i) for i in range(minimal_ports_count_required)]
         
         self.address = "localhost"
@@ -103,6 +114,17 @@ class Solver():
         self.master_to_agents_publisher_socket = self.context.socket(zmq.PUB)
         self.master_to_agents_publisher_socket.bind( self.master_publisher_address )
 
+    def _init_agents_available_addresses_and_ports(self):
+
+        minimal_ports_count_required = self.n_jobs + 2 # including master ports
+        if self.available_ports is not None:
+            available_ports_count = len(self.available_ports)
+            if available_ports_count < minimal_ports_count_required:
+                exception_string = "For {} agents required at least {} available ports. Set available_ports list manually or set it None for auto allocation".format(self.n_jobs, minimal_ports_count_required)
+                raise Exception(exception_string)
+        else:
+            self.available_ports = [str(int(self.default_port) + i) for i in range(minimal_ports_count_required)]
+
         current_port_id = 2
         available_agent_to_agent_ports = [self.available_ports[current_port_id + i] for i in range(self.n_jobs)]
         self.available_agent_to_agent_ports = available_agent_to_agent_ports
@@ -117,9 +139,6 @@ class Solver():
         master_to_agent_updates_sender, agent_from_master_updates_receiver = Pipe()
         self.master_to_agent_updates_sender = master_to_agent_updates_sender
         self.agent_from_master_updates_receiver = agent_from_master_updates_receiver
-
-        #self.master_publisher_queue = SimpleQueue()
-        #self.master_subscriber_queue = SimpleQueue()
 
 
     def solve(self):
@@ -144,7 +163,7 @@ class Solver():
             total_time = time.perf_counter() - start_time
             steps_count += 1
             new_best_string = "New best score!" if new_best_flag else ""
-            if self.logging_level == "fresh_only" and new_best_flag:
+            if self.logging_level == LoggingLevel.FreshOnly and new_best_flag:
                 self.logger.info(f"Solutions received: {steps_count} Best score: {self.global_top_individual.score}, Solving time: {total_time:.6f} {new_best_string}")
 
             if len(self.observers) >= 1:
@@ -171,12 +190,12 @@ class Solver():
         def run_agent_solving(agent):
             agent.solve()
 
-        if self.parallelization_backend == "threading":
+        if self.parallelization_backend == ParallelizationBackend.Threading:
             agents_process_pool = ThreadPool(id="agents_pool")
-        elif self.parallelization_backend == "processing":
+        elif self.parallelization_backend == ParallelizationBackend.Multiprocessing:
             agents_process_pool = ProcessPool(id="agents_pool")
         else:
-            raise Exception("parallelization_backend can be only \"threading\" (for debugging) or \"processing\" (for production)")
+            raise Exception("parallelization_backend must be value of enum ParallelizationBackend from greyjack.agents.base module")
         agents_process_pool.ncpus = self.n_jobs
         agents_process_pool.imap(run_agent_solving, agents)
 
@@ -199,6 +218,10 @@ class Solver():
             for j in range(self.n_jobs):
                 agents[i].round_robin_status_dict[agents[j].agent_id] = deepcopy(agents[i].agent_status)
 
+        for i in range(self.n_jobs):
+            agents[i].master_subscriber_address = deepcopy(self.master_subscriber_address)
+            agents[i].master_publisher_address = deepcopy(self.master_publisher_address)
+
         if self.is_linux:
             agents_updates_senders = []
             agents_updates_receivers = []
@@ -210,16 +233,9 @@ class Solver():
             for i in range(self.n_jobs):
                 agents[i].agent_to_agent_pipe_sender = agents_updates_senders[i]
                 agents[i].agent_to_agent_pipe_receiver = agents_updates_receivers[i]
-                agents[i].agent_to_master_updates_sender = self.agent_to_master_updates_sender
-                agents[i].agent_from_master_updates_receiver = self.agent_from_master_updates_receiver
-                #agents[i].master_publisher_queue = self.master_publisher_queue
-                #agents[i].master_subscriber_queue = self.master_subscriber_queue
-            
         else:
             for i in range(self.n_jobs):
                 agents[i].agent_address_for_other_agents = deepcopy("tcp://{}:{}".format(self.available_agent_to_agent_addresses[i], self.available_agent_to_agent_ports[i]))
-                agents[i].master_subscriber_address = deepcopy(self.master_subscriber_address)
-                agents[i].master_publisher_address = deepcopy(self.master_publisher_address)
             for i in range(self.n_jobs):
                 next_agent_id = (i + 1) % self.n_jobs
                 agents[i].next_agent_address = deepcopy(agents[next_agent_id].agent_address_for_other_agents)
@@ -227,11 +243,9 @@ class Solver():
         return agents
 
     def receive_agent_publication(self):
-        if self.is_linux:
-            agent_publication = self.master_from_agent_updates_receiver.recv()
-        else:
-            agent_publication = self.master_to_agents_subscriber_socket.recv()
-            agent_publication = orjson.loads(agent_publication)
+
+        agent_publication = self.master_to_agents_subscriber_socket.recv()
+        agent_publication = orjson.loads(agent_publication)
         agent_id = agent_publication["agent_id"]
         agent_status = agent_publication["status"]
         local_step = agent_publication["step"]
@@ -252,11 +266,8 @@ class Solver():
         else:
             master_publication = [None, self.is_variables_info_received]
 
-        if not self.is_linux:
-            master_publication = orjson.dumps(master_publication)
-            self.master_to_agents_publisher_socket.send( master_publication )
-        else:
-            self.master_to_agent_updates_sender.send(master_publication)
+        master_publication = orjson.dumps(master_publication)
+        self.master_to_agents_publisher_socket.send( master_publication )
 
     def update_global_top_solution(self):
         individual_list = self.global_top_individual.as_list()

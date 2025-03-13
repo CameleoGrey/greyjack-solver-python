@@ -14,6 +14,8 @@ from examples.object_oriented.nqueens.persistence.CotwinBuilderNQueens import Co
 from greyjack.agents.termination_strategies import *
 from greyjack.agents import *
 from greyjack.Solver import Solver
+from greyjack.agents.base.LoggingLevel import LoggingLevel
+from greyjack.agents.base.ParallelizationBackend import ParallelizationBackend
 from greyjack.agents.TabuSearch import TabuSearch
 from greyjack.agents.GeneticAlgorithm import GeneticAlgorithm
 from greyjack.agents.LateAcceptance import LateAcceptance
@@ -21,7 +23,7 @@ from greyjack.agents.LateAcceptance import LateAcceptance
 if __name__ == "__main__":
 
     # build domain model
-    domain_builder = DomainBuilderNQueens(256, random_seed=45)
+    domain_builder = DomainBuilderNQueens(1024, random_seed=45)
     cotwin_builder = CotwinBuilderNQueens()
 
     #termination_strategy = StepsLimit(step_count_limit=1000)
@@ -39,10 +41,10 @@ if __name__ == "__main__":
                            migration_frequency=10, termination_strategy=termination_strategy)"""
 
     solver = Solver(domain_builder, cotwin_builder, agent, 
-                    n_jobs=10, parallelization_backend="processing", #processing, threading 
-                    score_precision=[0], logging_level="info")
+                    ParallelizationBackend.Multiprocessing, LoggingLevel.FreshOnly,
+                    n_jobs=10, score_precision=[0])
     solution = solver.solve()
-    print( "Cotwin solution looks that: " )
-    print( solution )
+    #print( "Cotwin solution looks that: " )
+    #print( solution )
 
     print( "done" )
