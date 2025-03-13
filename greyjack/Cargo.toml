@@ -1,6 +1,6 @@
 [package]
 name = "greyjack"
-version = "0.0.20"
+version = "0.0.21"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -19,8 +19,8 @@ ndarray-stats = "0.6.0"
 chrono = "0.4.39"
 polars = { version = "0.46.0", features = ["lazy", "ndarray", "serde", "abs"] }
 
-#[profile.release]
-#lto = true
-#codegen-units = 1
-#debug = true
-#opt-level = 3
+[profile.release]
+lto = true
+codegen-units = 1
+debug = true
+opt-level = 3
