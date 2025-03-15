@@ -24,6 +24,16 @@ impl SimpleScore {
         }
     }
 
+    #[getter]
+    pub fn get_simple_value(&self) -> f64 {
+        self.simple_value
+    }
+
+    #[setter]
+    pub fn set_simple_value(&mut self, value: f64) {
+        self.simple_value = value;
+    }
+
     fn get_sum_abs(&self) -> f64 {
         self.simple_value.abs()
     }

@@ -93,6 +93,10 @@ impl VariablesManager {
         let random_group_id = Uniform::new(0, self.n_semantic_groups).sample(&mut StdRng::from_entropy());
         let group_name = &self.semantic_group_keys[random_group_id];
         let group_ids = self.semantic_groups_map.get(group_name).unwrap();
+
+        //println!("{:?}, {:?}, {:?}", self.n_semantic_groups, group_ids, &self.semantic_group_keys);
+        //println!("{:?}", self.semantic_groups_map);
+
         return (group_ids, group_name);
     }
 

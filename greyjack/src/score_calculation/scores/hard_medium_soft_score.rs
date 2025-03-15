@@ -28,6 +28,36 @@ impl HardMediumSoftScore {
         }
     }
 
+    #[getter]
+    pub fn get_hard_score(&self) -> f64 {
+        self.hard_score
+    }
+
+    #[getter]
+    pub fn get_medium_score(&self) -> f64 {
+        self.medium_score
+    }
+
+    #[getter]
+    pub fn get_soft_score(&self) -> f64 {
+        self.soft_score
+    }
+
+    #[setter]
+    pub fn set_hard_score(&mut self, value: f64) {
+        self.hard_score = value;
+    }
+
+    #[setter]
+    pub fn set_medium_score(&mut self, value: f64) {
+        self.medium_score = value;
+    }
+
+    #[setter]
+    pub fn set_soft_score(&mut self, value: f64) {
+        self.soft_score = value;
+    }
+
     fn get_sum_abs(&self) -> f64 {
         self.hard_score.abs() + self.medium_score.abs() + self.soft_score.abs()
     }

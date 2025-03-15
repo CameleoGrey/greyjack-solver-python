@@ -48,9 +48,10 @@ impl VariablesManagerPy {
     }
 
     #[new]
+    #[pyo3(signature = (variables_vec_py))]
     pub fn new(variables_vec_py: Vec<GJPlanningVariablePy>) -> Self {
 
-        let mut variables_vec: Vec<GJPlanningVariable> = variables_vec_py.iter().map(|var_py| {
+        let variables_vec: Vec<GJPlanningVariable> = variables_vec_py.iter().map(|var_py| {
             GJPlanningVariable::new(
                 var_py.name.clone(), 
                 var_py.lower_bound, 

@@ -93,7 +93,8 @@ impl CandidateDfsBuilder {
                             updated_column = updated_column.cast(&DataType::Int64).unwrap();
                         }
                     } else if column_name.eq("sample_id") {
-                        updated_column = updated_column.cast(&DataType::UInt64).unwrap();
+                        // using Int64 instead UInt64 because Python converts UInt64 to float
+                        updated_column = updated_column.cast(&DataType::Int64).unwrap();
                     }
 
 

@@ -33,7 +33,7 @@ impl CandidateDfsBuilderPy {
         entity_is_int_map: HashMap<String, bool>,
     ) -> Self {
 
-        let mut variables_vec: Vec<GJPlanningVariable> = variables_vec_py.iter().map(|var_py| {
+        let variables_vec: Vec<GJPlanningVariable> = variables_vec_py.iter().map(|var_py| {
             GJPlanningVariable::new(
                 var_py.name.clone(), 
                 var_py.lower_bound, 

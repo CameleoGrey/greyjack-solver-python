@@ -1,7 +1,9 @@
 
 import polars as pl
 from greyjack.greyjack import VariablesManagerPy, CandidateDfsBuilderPy
-from greyjack.variables import *
+from greyjack.variables.GJFloat import GJFloat
+from greyjack.variables.GJInteger import GJInteger
+from greyjack.variables.GJBinary import GJBinary
 
 class OOPScoreRequester:
     def __init__(self, cotwin):

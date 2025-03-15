@@ -134,7 +134,8 @@ impl Mover {
     
         let (group_ids, group_name) = variables_manager.get_random_semantic_group_ids();
         let group_mutation_rate = self.group_mutation_rates_map[group_name];
-        let random_values = vec![Uniform::new_inclusive(0.0, 1.0).sample(&mut StdRng::from_entropy()); variables_manager.variables_count];
+        let mut random_generator = StdRng::from_entropy();
+        let random_values: Vec<f64> = (0..variables_manager.variables_count).into_iter().map(|x| Uniform::new_inclusive(0.0, 1.0).sample(&mut random_generator)).collect();
         let crossover_mask: Vec<bool> = random_values.iter().map(|x| x < &group_mutation_rate).collect();
         let current_change_count = crossover_mask.iter().filter(|x| **x == true).count();
 
