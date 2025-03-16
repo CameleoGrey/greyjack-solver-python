@@ -1,17 +1,17 @@
 import numpy as np
 
 from greyjack.score_calculation.score_calculators.PlainScoreCalculator import PlainScoreCalculator
-from greyjack.score_calculation.scores.HardSoftScore import HardSoftScore
+from greyjack.score_calculation.scores.HardMediumSoftScore import HardMediumSoftScore
 from greyjack.score_calculation.scores.ScoreVariants import ScoreVariants
 import polars as pl
 from numba import jit
 
-class VRPPlainScoreCalculator(PlainScoreCalculator):
+class PlainScoreCalculatorVRP(PlainScoreCalculator):
 
     def __init__(self):
         super().__init__()
 
-        self.score_variant = ScoreVariants.HardSoftScore
+        self.score_variant = ScoreVariants.HardMediumSoftScore
         
         self.add_prescoring_function("build_common_df", self.build_common_df)
 
@@ -54,7 +54,7 @@ class VRPPlainScoreCalculator(PlainScoreCalculator):
 
         scores = duplicate_counts["duplicates_count"].to_numpy()
         scores = 1000 * scores # multiply for competing with capacity constraint
-        scores = [HardSoftScore(score, 0) for score in scores]
+        scores = [HardMediumSoftScore(score, 0, 0) for score in scores]
 
         return scores
 
@@ -79,7 +79,7 @@ class VRPPlainScoreCalculator(PlainScoreCalculator):
 
         scores = []
         for sample_id in range(samples_count):
-            current_score = HardSoftScore(0, 0)
+            current_score = HardMediumSoftScore(0, 0, 0)
             scores.append(current_score)
 
         for i, bad_sample_id in enumerate(bad_sample_ids):
@@ -96,7 +96,7 @@ class VRPPlainScoreCalculator(PlainScoreCalculator):
 
         scores = []
         for time_penalty in time_penalties:
-            current_score = HardSoftScore(time_penalty, 0)
+            current_score = HardMediumSoftScore(0.0, time_penalty, 0)
             scores.append(current_score)
 
         return scores
@@ -174,7 +174,7 @@ class VRPPlainScoreCalculator(PlainScoreCalculator):
 
         scores = []
         for path_distance in path_distances:
-            current_score = HardSoftScore(0, path_distance)
+            current_score = HardMediumSoftScore(0, 0, path_distance)
             scores.append(current_score)
 
         return scores

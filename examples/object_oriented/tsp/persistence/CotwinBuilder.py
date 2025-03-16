@@ -4,7 +4,8 @@ import numpy as np
 from examples.object_oriented.tsp.cotwin.CotStop import CotStop
 from examples.object_oriented.tsp.cotwin.EdgeDistance import EdgeDistance
 from examples.object_oriented.tsp.cotwin.TSPCotwin import TSPCotwin
-from examples.object_oriented.tsp.score.TSPPlainScoreCalculator import TSPPlainScoreCalculator
+from examples.object_oriented.tsp.score.PlainScoreCalculatorTSP import PlainScoreCalculatorTSP
+from examples.object_oriented.tsp.score.IncrementalScoreCalculatorTSP import IncrementalScoreCalculatorTSP
 
 from greyjack.persistence.CotwinBuilderBase import CotwinBuilderBase
 from greyjack.variables.GJInteger import GJInteger
@@ -12,9 +13,11 @@ from greyjack.variables.GJInteger import GJInteger
 
 class CotwinBuilder(CotwinBuilderBase):
 
-    def __init__(self):
+    def __init__(self, use_incremental_score_calculator):
 
         super().__init__()
+
+        self.use_incremental_score_calculator = use_incremental_score_calculator
 
         pass
 
@@ -27,7 +30,11 @@ class CotwinBuilder(CotwinBuilderBase):
         # (!) better use distance matrix mapping than building and joining large distance dataframe!
         #tsp_cotwin.add_problem_facts_list(self._build_edge_distances(domain_model), "edge_distances")
 
-        score_calculator = TSPPlainScoreCalculator()
+        if self.use_incremental_score_calculator:
+            score_calculator = PlainScoreCalculatorTSP()
+        else:
+            score_calculator = IncrementalScoreCalculatorTSP()
+
         score_calculator.utility_objects["distance_matrix"] = domain_model.distance_matrix
         tsp_cotwin.set_score_calculator( score_calculator )
 

@@ -166,7 +166,7 @@ class Agent():
                 #print("step_time: {}".format(step_time))
                 total_time = time.perf_counter() - start_time
                 if self.logging_level == LoggingLevel.Info and self.agent_status == "alive":
-                    self.logger.info(f"Agent: {self.agent_id} Step: {step_id} Best score: {self.agent_top_individual.score}, Solving time: {total_time:.6f}")
+                    self.logger.info(f"Agent: {self.agent_id:4} Step: {step_id} Best score: {self.agent_top_individual.score}, Solving time: {total_time:.6f}")
 
                 if self.total_agents_count > 1:
                     self.steps_to_send_updates -= 1
@@ -177,7 +177,7 @@ class Agent():
                     self.agent_status = "dead"
                     self.round_robin_status_dict[self.agent_id] = self.agent_status
                     if not self.is_last_message_shown:
-                        self.logger.warning(f"Agent: {self.agent_id} has successfully terminated work. Now it's just transmitting updates between its neighbours until at least one agent is alive.")
+                        self.logger.warning(f"Agent: {self.agent_id:4} has successfully terminated work. Now it's just transmitting updates between its neighbours until at least one agent is alive.")
                         self.is_last_message_shown = True
 
                 self._send_candidate_to_master(step_id)

@@ -1,6 +1,7 @@
-import re
 
+import re
 import numpy as np
+from numba import jit
 
 from examples.object_oriented.vrp.domain.VehicleRoutingPlan import VehicleRoutingPlan
 from examples.object_oriented.vrp.domain.Vehicle import Vehicle
@@ -36,7 +37,8 @@ class DomainBuilder(DomainBuilderBase):
                     distances_to_other_customers_dict[to_customer_name] = current_distance
                 customers_dict[i].distances_to_other_customers_dict = distances_to_other_customers_dict
         else:
-            distance_matrix = self._build_distance_matrix( customers_dict )
+            customers_list = [customers_dict[i] for i in range(len(customers_dict))]
+            distance_matrix = self._build_distance_matrix( customers_list )
 
 
         vehicles_capacity = read_file["metadata"]["vehicles_capacity"]
@@ -87,18 +89,26 @@ class DomainBuilder(DomainBuilderBase):
     def build_from_domain(self, domain):
         return super().build_from_domain(domain)
 
-    def _build_distance_matrix(self, customers_dict):
+    def _build_distance_matrix(self, locations_list):
 
-        n_customers = len(customers_dict)
-        distance_matrix = np.zeros( (n_customers, n_customers), dtype=np.int64 )
-        #distance_matrix = np.zeros((n_customers, n_customers), dtype=np.float32)
-        for i in range(n_customers):
-            for j in range(n_customers):
-                customer_from = customers_dict[i]
-                customer_to = customers_dict[j]
-                distance_from_to = customer_from.get_distance_to_other_customer( customer_to )
-                distance_matrix[i][j] = round(1000 * distance_from_to, 0)
-                #distance_matrix[i][j] = distance_from_to
+        @staticmethod
+        @jit()
+        def compute_distance_matrix(latitudes, longitudes, n_locations):
+            distance_matrix = np.zeros( (n_locations, n_locations), dtype=np.int64 )
+            for i in range(n_locations):
+                for j in range(n_locations):
+                    distance_from_to = np.sqrt((latitudes[i] - latitudes[j])**2 + (longitudes[i] - longitudes[j])**2)
+                    distance_matrix[i][j] = round(1000 * distance_from_to, 0)
+            return distance_matrix
+
+        n_locations = len(locations_list)
+        latitudes = np.zeros((n_locations, ), dtype=np.float64)
+        longitudes = np.zeros((n_locations, ), dtype=np.float64)
+        for i, location in enumerate(locations_list):
+            latitudes[i] = location.latitude
+            longitudes[i] = location.longitude
+    
+        distance_matrix = compute_distance_matrix(latitudes, longitudes, n_locations)
 
         return distance_matrix
 

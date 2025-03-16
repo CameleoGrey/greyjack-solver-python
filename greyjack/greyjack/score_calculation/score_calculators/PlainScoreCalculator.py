@@ -59,12 +59,9 @@ class PlainScoreCalculator:
         for prescoring_function in self.prescoring_functions.values():
             prescoring_function(planning_entity_dfs, problem_fact_dfs)
 
-        scores_vec = [
-            self.constraints[name](planning_entity_dfs, problem_fact_dfs)
-            for name in self.constraints
-        ]
-
         constraints_names_list = list(self.constraints.keys())
+        scores_vec = [self.constraints[name](planning_entity_dfs, problem_fact_dfs) for name in constraints_names_list]
+
         constraints_count = len(scores_vec)
         samples_count = len(scores_vec[0])
         scores = []

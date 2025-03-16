@@ -1,19 +1,21 @@
-import random
 
 import numpy as np
+from copy import deepcopy
 
 from examples.object_oriented.vrp.cotwin.CotCustomer import CotCustomer
 from examples.object_oriented.vrp.cotwin.CotStop import CotStop
 from examples.object_oriented.vrp.cotwin.CotVehicle import CotVehicle
 from examples.object_oriented.vrp.cotwin.VRPCotwin import VRPCotwin
-from examples.object_oriented.vrp.score.VRPPlainScoreCalculator import VRPPlainScoreCalculator
+from examples.object_oriented.vrp.score.PlainScoreCalculatorVRP import PlainScoreCalculatorVRP
+from examples.object_oriented.vrp.score.IncrementalScoreCalculatorVRP import IncrementalScoreCalculatorVRP
 
 from greyjack.persistence.CotwinBuilderBase import CotwinBuilderBase
 from greyjack.variables.GJInteger import GJInteger
 
 class CotwinBuilder(CotwinBuilderBase):
 
-    def __init__(self):
+    def __init__(self, use_incremental_score_calculator):
+        self.use_incremental_score_calculator = use_incremental_score_calculator
         pass
 
     def build_cotwin(self, domain, is_already_initialized):
@@ -24,11 +26,17 @@ class CotwinBuilder(CotwinBuilderBase):
         vrp_cotwin.add_problem_facts_list(self._build_problem_fact_vehicles(domain), "vehicles")
         vrp_cotwin.add_problem_facts_list(self._build_problem_fact_customers(domain), "customers")
 
-        score_calculator = VRPPlainScoreCalculator()
-        score_calculator.utility_objects["distance_matrix"] = domain.distance_matrix
-        if not domain.time_windowed:
-            score_calculator.remove_constraint("late_arrival_penalty")
+        if self.use_incremental_score_calculator:
+            score_calculator = IncrementalScoreCalculatorVRP()
+            # to avoid joins while calculating score
+            self.add_incremental_utilities(domain, score_calculator)
 
+        else:
+            score_calculator = PlainScoreCalculatorVRP()
+            if not domain.time_windowed:
+                score_calculator.remove_constraint("late_arrival_penalty")
+
+        score_calculator.utility_objects["distance_matrix"] = domain.distance_matrix
         vrp_cotwin.set_score_calculator( score_calculator )
 
         return vrp_cotwin
@@ -86,7 +94,7 @@ class CotwinBuilder(CotwinBuilderBase):
             #initial_value=i
             #initial_value=initial_customer_ids[i - n_depots]
             #semantic_groups=["customer_assignment", "common"]
-            planning_customer_id = GJInteger(n_depots, n_customers-1, False, initial_vehicle_ids[i - n_depots], semantic_groups=["customer_assignment", "common"])
+            planning_customer_id = GJInteger(n_depots, n_customers-1, False, initial_customer_ids[i - n_depots], semantic_groups=["customer_assignment", "common"])
 
             planning_stop = CotStop(planning_vehicle_id, planning_customer_id)
             planning_stops.append(planning_stop)
@@ -177,3 +185,40 @@ class CotwinBuilder(CotwinBuilderBase):
                 initial_customer_ids.append(None)
 
         return initial_vehicle_ids, initial_customer_ids
+    
+    def add_incremental_utilities(self, domain, score_calculator):
+        k_vehicles = len(domain.vehicles)
+        depot_ids = np.zeros((k_vehicles, ), dtype=np.int64)
+        capacities = np.zeros((k_vehicles, ), dtype=np.int64)
+        for k in range(k_vehicles):
+            depot_ids[k] = domain.vehicles[k].depot_matrix_id
+            capacities[k] = domain.vehicles[k].capacity
+        score_calculator.utility_objects["depot_ids"] = depot_ids
+        score_calculator.utility_objects["vehicle_capacities"] = capacities
+
+        n_customers = len(domain.customers_dict)
+        demands = np.zeros((n_customers, ), dtype=np.int64)
+        for i in range(n_customers):
+            demands[i] = domain.customers_dict[i].demand
+        score_calculator.utility_objects["demands"] = demands
+
+        score_calculator.utility_objects["time_windowed"] = domain.time_windowed
+        if domain.time_windowed:
+            work_day_starts = np.zeros((k_vehicles, ), dtype=np.int64)
+            work_day_ends = np.zeros((k_vehicles, ), dtype=np.int64)
+            for k in range(k_vehicles):
+                work_day_starts[k] = domain.vehicles[k].work_day_start
+                work_day_ends[k] = domain.vehicles[k].work_day_end
+            score_calculator.utility_objects["work_day_starts"] = work_day_starts
+            score_calculator.utility_objects["work_day_ends"] = work_day_ends
+
+            time_window_starts = np.zeros((n_customers, ), dtype=np.int64)
+            time_window_ends = np.zeros((n_customers, ), dtype=np.int64)
+            service_times = np.zeros((n_customers, ), dtype=np.int64)
+            for i in range(n_customers):
+                time_window_starts[i] = domain.customers_dict[i].time_window_start
+                time_window_ends[i] = domain.customers_dict[i].time_window_end
+                service_times[i] = domain.customers_dict[i].service_time
+            score_calculator.utility_objects["time_window_starts"] = time_window_starts
+            score_calculator.utility_objects["time_window_ends"] = time_window_ends
+            score_calculator.utility_objects["service_times"] = service_times

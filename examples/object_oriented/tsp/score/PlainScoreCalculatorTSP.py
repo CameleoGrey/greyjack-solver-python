@@ -6,7 +6,7 @@ from greyjack.score_calculation.scores.ScoreVariants import ScoreVariants
 import polars as pl
 from numba import jit
 
-class TSPPlainScoreCalculator( PlainScoreCalculator ):
+class PlainScoreCalculatorTSP( PlainScoreCalculator ):
 
     def __init__(self):
         super().__init__()

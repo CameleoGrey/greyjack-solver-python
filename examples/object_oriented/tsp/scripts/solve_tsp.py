@@ -26,21 +26,19 @@ if __name__ == "__main__":
     #file_path = Path(data_dir_path, "cook", "air", "st70.tsp") # 682.57 - optimum
     #file_path = Path(data_dir_path, "belgium", "road-km", "belgium-road-km-n100.tsp") # 1727.262 - optimum, 2089 - first_fit
     #file_path = Path(data_dir_path, "tsplib", "a280.tsp") # 2579 - optimal
-    file_path = Path(data_dir_path, "cook", "air", "pcb442.tsp") #optimum: 50778; first_fit: ~63k
+    #file_path = Path(data_dir_path, "cook", "air", "pcb442.tsp") #optimum: 50778; first_fit: ~63k
     #file_path = Path(data_dir_path, "cook", "air", "lu980.tsp")
     #file_path = Path(data_dir_path, "other", "air", "usa_tx_2743.tsp") #optimum: ~282; first_fit: ~338
     #file_path = Path(data_dir_path, "belgium", "air", "belgium-n2750.tsp")
-    #TODO: optimize distance_matrix building to work normally with big datasets
     #file_path = Path(data_dir_path, "tsplib", "fnl4461.tsp") #optimum: 182566; first_fit: ~230k
-    #file_path = Path(data_dir_path, "cook", "air", "gr9882.tsp") #optimum: 300899; first_fit: ~400k
+    file_path = Path(data_dir_path, "cook", "air", "gr9882.tsp") #optimum: 300899; first_fit: ~400k
 
     domain_builder = DomainBuilder(file_path)
-    cotwin_builder = CotwinBuilder()
-    cotwin = CotwinBuilder()
+    cotwin_builder = CotwinBuilder(use_incremental_score_calculator=True)
 
     #termination_strategy = StepsLimit(step_count_limit=1000)
-    #termination_strategy = TimeSpentLimit(time_seconds_limit=60)
-    termination_strategy = ScoreNoImprovement(time_seconds_limit=5)
+    termination_strategy = TimeSpentLimit(time_seconds_limit=60)
+    #termination_strategy = ScoreNoImprovement(time_seconds_limit=60)
     #termination_strategy = ScoreLimit(score_to_compare=[0])
     agent = TabuSearch(neighbours_count=128, tabu_entity_rate=0.2, 
                        mutation_rate_multiplier=None, move_probas=[0.0, 0.2, 0.2, 0.2, 0.2, 0.2],
@@ -53,7 +51,7 @@ if __name__ == "__main__":
                            migration_frequency=10000, termination_strategy=termination_strategy)"""
 
     solver = Solver(domain_builder, cotwin_builder, agent, 
-                    ParallelizationBackend.Multiprocessing, LoggingLevel.FreshOnly,
+                    ParallelizationBackend.Multiprocessing, LoggingLevel.Info,
                     n_jobs=10, score_precision=[0, 0])
     solution = solver.solve()
 

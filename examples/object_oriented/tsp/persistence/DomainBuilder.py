@@ -2,6 +2,7 @@
 
 import re
 import numpy as np
+from numba import jit
 from examples.object_oriented.tsp.domain.TravelSchedule import TravelSchedule
 from examples.object_oriented.tsp.domain.Vehicle import Vehicle
 from examples.object_oriented.tsp.domain.Location import Location
@@ -65,21 +66,26 @@ class DomainBuilder(DomainBuilderBase):
     def build_from_domain(self, domain):
         return super().build_from_domain(domain)
         
-
-
     def _build_distance_matrix(self, locations_list):
 
+        @staticmethod
+        @jit()
+        def compute_distance_matrix(latitudes, longitudes, n_locations):
+            distance_matrix = np.zeros( (n_locations, n_locations), dtype=np.int64 )
+            for i in range(n_locations):
+                for j in range(n_locations):
+                    distance_from_to = np.sqrt((latitudes[i] - latitudes[j])**2 + (longitudes[i] - longitudes[j])**2)
+                    distance_matrix[i][j] = round(1000 * distance_from_to, 0)
+            return distance_matrix
 
         n_locations = len(locations_list)
-        distance_matrix = np.zeros( (n_locations, n_locations), dtype=np.int64 )
-        #distance_matrix = np.zeros((n_locations, n_locations), dtype=np.float32)
-        for i in range(n_locations):
-            for j in range(n_locations):
-                location_from = locations_list[i]
-                location_to = locations_list[j]
-                distance_from_to = location_from.get_distance_to_other_location( location_to )
-                distance_matrix[i][j] = round(1000 * distance_from_to, 0)
-                #distance_matrix[i][j] = distance_from_to
+        latitudes = np.zeros((n_locations, ), dtype=np.float64)
+        longitudes = np.zeros((n_locations, ), dtype=np.float64)
+        for i, location in enumerate(locations_list):
+            latitudes[i] = location.latitude
+            longitudes[i] = location.longitude
+    
+        distance_matrix = compute_distance_matrix(latitudes, longitudes, n_locations)
 
         return distance_matrix
 

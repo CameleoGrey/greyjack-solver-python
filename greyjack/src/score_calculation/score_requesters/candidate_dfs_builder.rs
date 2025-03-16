@@ -284,7 +284,21 @@ impl CandidateDfsBuilder {
                 delta_data_map[df_name].keys().into_iter().for_each(|column_name| {
 
                     let updated_column_data = &delta_data_map[df_name][column_name];
-                    let updated_column = Series::new(column_name.into(), updated_column_data);
+                    let mut updated_column = Series::new(column_name.into(), updated_column_data);
+
+                    if self.entity_is_int_map.contains_key(column_name) {
+                        if *self.entity_is_int_map.get(column_name).unwrap() {
+                            updated_column = updated_column.cast(&DataType::Int64).unwrap();
+                        }
+                    } else if column_name.eq("sample_id") {
+                        // using Int64 instead UInt64 because Python converts UInt64 to float
+                        updated_column = updated_column.cast(&DataType::Int64).unwrap();
+                    } else if column_name.eq("candidate_df_row_id") {
+                        // using Int64 instead UInt64 because Python converts UInt64 to float
+                        updated_column = updated_column.cast(&DataType::Int64).unwrap();
+                    }
+
+
                     current_df.with_column(updated_column).unwrap();
                 });
                 current_df = current_df.sort(["sample_id", "candidate_df_row_id"], SortMultipleOptions::default()).unwrap();

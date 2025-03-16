@@ -103,12 +103,12 @@ class OOPScoreRequester:
     def request_score_plain(self, samples):
 
         planning_entity_dfs, problem_fact_dfs = self.candidate_dfs_builder.get_plain_candidate_dfs(samples)
-        score_batch = self.cotwin.get_score(planning_entity_dfs, problem_fact_dfs)
+        score_batch = self.cotwin.get_score_plain(planning_entity_dfs, problem_fact_dfs)
         return score_batch
 
     def request_score_incremental(self, sample, deltas):
 
         planning_entity_dfs, problem_fact_dfs, delta_dfs = self.candidate_dfs_builder.get_incremental_candidate_dfs(sample, deltas)
-        score_batch = self.cotwin.get_score(planning_entity_dfs, problem_fact_dfs, delta_dfs)
+        score_batch = self.cotwin.get_score_incremental(planning_entity_dfs, problem_fact_dfs, delta_dfs)
         return score_batch
  

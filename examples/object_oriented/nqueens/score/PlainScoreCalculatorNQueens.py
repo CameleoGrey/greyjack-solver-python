@@ -5,12 +5,8 @@ from greyjack.score_calculation.scores.SimpleScore import SimpleScore
 from greyjack.score_calculation.scores.ScoreVariants import ScoreVariants
 import polars as pl
 
-#import os
-#os.environ["POLARS_MAX_THREADS"] = "1"
-#os.environ["MIMALLOC_ABANDONED_PAGE_RESET"] = "1"
 
-
-class NQueensScoreCalculator(PlainScoreCalculator):
+class PlainScoreCalculatorNQueens(PlainScoreCalculator):
     def __init__(self):
 
         super().__init__()

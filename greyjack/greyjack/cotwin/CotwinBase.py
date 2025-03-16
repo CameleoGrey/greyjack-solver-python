@@ -22,5 +22,8 @@ class CotwinBase():
         self.score_calculator = score_calculator
         pass
 
-    def get_score(self, planning_entity_dfs, problem_fact_dfs):
+    def get_score_plain(self, planning_entity_dfs, problem_fact_dfs):
         return self.score_calculator.get_score(planning_entity_dfs, problem_fact_dfs)
+    
+    def get_score_incremental(self, planning_entity_dfs, problem_fact_dfs, delta_dfs):
+        return self.score_calculator.get_score(planning_entity_dfs, problem_fact_dfs, delta_dfs)

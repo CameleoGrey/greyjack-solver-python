@@ -16,7 +16,7 @@ class IncrementalScoreCalculator:
 
         self.score_type = None
         self.score_variant = None
-        self.is_incremental = False
+        self.is_incremental = True
 
     def add_constraint(self, constraint_name, constraint_function):
         self.constraints[constraint_name] = constraint_function
@@ -57,14 +57,11 @@ class IncrementalScoreCalculator:
                 self.score_type = HardMediumSoftScore
 
         for prescoring_function in self.prescoring_functions.values():
-            prescoring_function(planning_entity_dfs, problem_fact_dfs, delta_dfs, self.utility_objects)
-
-        scores_vec = [
-            self.constraints[name](planning_entity_dfs, problem_fact_dfs, delta_dfs, self.utility_objects)
-            for name in self.constraints
-        ]
+            prescoring_function(planning_entity_dfs, problem_fact_dfs, delta_dfs)
 
         constraints_names_list = list(self.constraints.keys())
+        scores_vec = [self.constraints[name](planning_entity_dfs, problem_fact_dfs, delta_dfs) for name in constraints_names_list]
+
         constraints_count = len(scores_vec)
         samples_count = len(scores_vec[0]) if scores_vec else 0
         scores = []
