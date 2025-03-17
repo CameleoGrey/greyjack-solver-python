@@ -4,7 +4,7 @@ import math
 class Customer():
      def __init__(self, id, name, latitude, longitude, demand=None,
                   time_window_start=None, time_window_end=None, service_time=None,
-                  distances_to_other_customers_dict=None):
+                  distances_to_other_customers_dict=None, frozen=False):
 
          self.id = id
          self.name = name
@@ -15,6 +15,7 @@ class Customer():
          self.time_window_end = time_window_end
          self.service_time = service_time
          self.distances_to_other_customers_dict = distances_to_other_customers_dict
+         self.frozen = frozen
 
          pass
 

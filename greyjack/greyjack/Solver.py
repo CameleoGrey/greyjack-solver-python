@@ -2,6 +2,7 @@
 import orjson
 import time
 import random
+import uuid
 
 from greyjack.agents.base.LoggingLevel import LoggingLevel
 from greyjack.agents.base.ParallelizationBackend import ParallelizationBackend
@@ -158,7 +159,7 @@ class Solver():
                 self.global_top_individual = received_individual
                 self.update_global_top_solution()
                 new_best_flag = True
-            self.send_global_update()
+            self.send_global_update(is_end=False)
 
             total_time = time.perf_counter() - start_time
             steps_count += 1
@@ -178,9 +179,17 @@ class Solver():
                     break
 
             if someone_alive is False:
+                self.send_global_update(is_end=True)
                 agents_process_pool.terminate()
+                agents_process_pool.join()
                 agents_process_pool.close()
                 del agents_process_pool
+                
+                # to prevent port binding errors in multistage scenario
+                del self.context
+                del self.master_to_agents_publisher_socket
+                del self.master_to_agents_subscriber_socket
+
                 gc.collect()
                 break
 
@@ -190,10 +199,11 @@ class Solver():
         def run_agent_solving(agent):
             agent.solve()
 
+        pool_name = str(uuid.uuid4())
         if self.parallelization_backend == ParallelizationBackend.Threading:
-            agents_process_pool = ThreadPool(id="agents_pool")
+            agents_process_pool = ThreadPool(id=pool_name)
         elif self.parallelization_backend == ParallelizationBackend.Multiprocessing:
-            agents_process_pool = ProcessPool(id="agents_pool")
+            agents_process_pool = ProcessPool(id=pool_name)
         else:
             raise Exception("parallelization_backend must be value of enum ParallelizationBackend from greyjack.agents.base module")
         agents_process_pool.ncpus = self.n_jobs
@@ -259,12 +269,12 @@ class Solver():
 
         return received_individual, agent_id, agent_status, local_step
 
-    def send_global_update(self):
+    def send_global_update(self, is_end):
 
         if self.is_agent_wins_from_comparing_with_global:
-            master_publication = [self.global_top_individual.as_list(), self.is_variables_info_received]
+            master_publication = [self.global_top_individual.as_list(), self.is_variables_info_received, is_end]
         else:
-            master_publication = [None, self.is_variables_info_received]
+            master_publication = [None, self.is_variables_info_received, is_end]
 
         master_publication = orjson.dumps(master_publication)
         self.master_to_agents_publisher_socket.send( master_publication )

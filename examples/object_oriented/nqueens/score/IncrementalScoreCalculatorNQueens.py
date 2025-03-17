@@ -77,7 +77,7 @@ class IncrementalScoreCalculatorNQueens(IncrementalScoreCalculator):
         return scores"""
     
 @staticmethod
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 #@numba.cfunc("float64[:](int64[:], int64[:], int64, int64[:], int64[:], int64[:], int64)")
 def compute_score_values(
     native_column_ids, 

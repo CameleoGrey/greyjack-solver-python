@@ -22,7 +22,7 @@ class IncrementalScoreCalculatorVRP(IncrementalScoreCalculator):
         # relatively easy implement and understand (comparable to true incremental or super optimized manner) 
         # with huge performance boost on large datasets
 
-        # from experiments: slower than clean Rust version by only ~50% (in average)
+        # from experiments: shows ~70% of clean Rust version performance (in average)
         
         planning_stops_df = planning_entity_dfs["planning_stops"]
         path_stops_deltas_df = delta_dfs["planning_stops"]
@@ -39,6 +39,13 @@ class IncrementalScoreCalculatorVRP(IncrementalScoreCalculator):
             time_window_starts = self.utility_objects["time_window_starts"]
             time_window_ends = self.utility_objects["time_window_ends"]
             service_times = self.utility_objects["service_times"]
+        else:
+            # to not catch error in the not time_windowed scenario
+            work_day_starts = np.zeros((1,), dtype=np.int64)
+            work_day_ends = np.zeros((1,), dtype=np.int64)
+            time_window_starts = np.zeros((1,), dtype=np.int64)
+            time_window_ends = np.zeros((1,), dtype=np.int64)
+            service_times = np.zeros((1,), dtype=np.int64)
         
         k_vehicles = len(capacities)
         vehicle_null_penalties = np.zeros((k_vehicles,), dtype=np.float64)
@@ -69,7 +76,7 @@ class IncrementalScoreCalculatorVRP(IncrementalScoreCalculator):
         return scores
 
 @staticmethod
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def compute_penalties(
     sample_vehicle_ids,
     sample_customer_ids,

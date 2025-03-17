@@ -28,7 +28,7 @@ class PlainScoreCalculatorVRP(PlainScoreCalculator):
         vehicle_df = problem_fact_dfs["vehicles"]
         planning_stops_df = planning_entity_dfs["planning_stops"]
 
-        customers_df = customers_df.rename({"customer_matrix_id": "customer_id"})
+        customers_df = customers_df.rename({"customer_vec_id": "customer_id"})
         common_df = (planning_stops_df
                       .with_row_index("index", offset=None)
                       .join(vehicle_df, on="vehicle_id", how="inner")
@@ -102,7 +102,7 @@ class PlainScoreCalculatorVRP(PlainScoreCalculator):
         return scores
 
     @staticmethod
-    @jit(nopython=True)  # numba gives speed similar to Java, see: (https://github.com/jabbalaci/SpeedTests)
+    @jit(nopython=True, cache=True)  # numba gives speed similar to Java, see: (https://github.com/jabbalaci/SpeedTests)
     def compute_time_penalties(data_matrix):
 
         unique_sample_ids = np.unique(data_matrix[:, 0])
@@ -119,16 +119,16 @@ class PlainScoreCalculatorVRP(PlainScoreCalculator):
             # unique_vehicle_ids = np.unique(sample_matrix[:, 1])
             # for vehicle_id in unique_vehicle_ids:
             # vehicle_matrix = sample_matrix[sample_matrix[:, 1] == vehicle_id]
-            vehicle_matrix_start = 0
-            vehicle_matrix_end = 0
-            last_sample_matrix_id = sample_matrix.shape[0] - 1
-            current_vehicle_id = sample_matrix[vehicle_matrix_start, 1]
-            while vehicle_matrix_start <= last_sample_matrix_id:
-                while sample_matrix[vehicle_matrix_end, 1] == current_vehicle_id:
-                    vehicle_matrix_end += 1
-                    if vehicle_matrix_end > last_sample_matrix_id:
+            vehicle_vec_start = 0
+            vehicle_vec_end = 0
+            last_sample_vec_id = sample_matrix.shape[0] - 1
+            current_vehicle_id = sample_matrix[vehicle_vec_start, 1]
+            while vehicle_vec_start <= last_sample_vec_id:
+                while sample_matrix[vehicle_vec_end, 1] == current_vehicle_id:
+                    vehicle_vec_end += 1
+                    if vehicle_vec_end > last_sample_vec_id:
                         break
-                vehicle_matrix = sample_matrix[vehicle_matrix_start: vehicle_matrix_end]
+                vehicle_matrix = sample_matrix[vehicle_vec_start: vehicle_vec_end]
 
                 work_day_start = vehicle_matrix[0][2]
                 work_day_end = vehicle_matrix[0][3]
@@ -157,10 +157,10 @@ class PlainScoreCalculatorVRP(PlainScoreCalculator):
 
                 time_penalties[sample_id] += trip_time_penalty
 
-                if vehicle_matrix_end > last_sample_matrix_id:
+                if vehicle_vec_end > last_sample_vec_id:
                     break
-                vehicle_matrix_start = vehicle_matrix_end
-                current_vehicle_id = sample_matrix[vehicle_matrix_start, 1]
+                vehicle_vec_start = vehicle_vec_end
+                current_vehicle_id = sample_matrix[vehicle_vec_start, 1]
 
         return time_penalties
 
@@ -180,7 +180,7 @@ class PlainScoreCalculatorVRP(PlainScoreCalculator):
         return scores
 
     @staticmethod
-    @jit(nopython=True) # numba gives speed similar to Java, see: (https://github.com/jabbalaci/SpeedTests)
+    @jit(nopython=True, cache=True) # numba gives speed similar to Java, see: (https://github.com/jabbalaci/SpeedTests)
     def compute_path_distances(data_matrix, distance_matrix):
 
         unique_sample_ids = np.unique(data_matrix[:, 0])
@@ -197,23 +197,23 @@ class PlainScoreCalculatorVRP(PlainScoreCalculator):
             # unique_vehicle_ids = np.unique(sample_matrix[:, 1])
             # for vehicle_id in unique_vehicle_ids:
                 # vehicle_matrix = sample_matrix[sample_matrix[:, 1] == vehicle_id]
-            vehicle_matrix_start = 0
-            vehicle_matrix_end = 0
-            last_sample_matrix_id = sample_matrix.shape[0] - 1
-            current_vehicle_id = sample_matrix[vehicle_matrix_start, 1]
-            while vehicle_matrix_start <= last_sample_matrix_id:
-                while sample_matrix[vehicle_matrix_end, 1] == current_vehicle_id:
-                    vehicle_matrix_end += 1
-                    if vehicle_matrix_end > last_sample_matrix_id:
+            vehicle_vec_start = 0
+            vehicle_vec_end = 0
+            last_sample_vec_id = sample_matrix.shape[0] - 1
+            current_vehicle_id = sample_matrix[vehicle_vec_start, 1]
+            while vehicle_vec_start <= last_sample_vec_id:
+                while sample_matrix[vehicle_vec_end, 1] == current_vehicle_id:
+                    vehicle_vec_end += 1
+                    if vehicle_vec_end > last_sample_vec_id:
                         break
-                vehicle_matrix = sample_matrix[vehicle_matrix_start : vehicle_matrix_end]
+                vehicle_matrix = sample_matrix[vehicle_vec_start : vehicle_vec_end]
 
-                depot_matrix_id = vehicle_matrix[0][2]
+                depot_vec_id = vehicle_matrix[0][2]
                 planning_stop_ids = vehicle_matrix[:, 3]
 
                 current_path_distance = 0
-                current_path_distance += distance_matrix[depot_matrix_id][planning_stop_ids[0]]
-                current_path_distance += distance_matrix[planning_stop_ids[-1]][depot_matrix_id]
+                current_path_distance += distance_matrix[depot_vec_id][planning_stop_ids[0]]
+                current_path_distance += distance_matrix[planning_stop_ids[-1]][depot_vec_id]
                 for i in range(1, len(planning_stop_ids)):
                     from_id = planning_stop_ids[i - 1]
                     to_id = planning_stop_ids[i]
@@ -221,9 +221,9 @@ class PlainScoreCalculatorVRP(PlainScoreCalculator):
 
                 path_distances[sample_id] += current_path_distance
 
-                if vehicle_matrix_end > last_sample_matrix_id:
+                if vehicle_vec_end > last_sample_vec_id:
                     break
-                vehicle_matrix_start = vehicle_matrix_end
-                current_vehicle_id = sample_matrix[vehicle_matrix_start, 1]
+                vehicle_vec_start = vehicle_vec_end
+                current_vehicle_id = sample_matrix[vehicle_vec_start, 1]
 
         return path_distances

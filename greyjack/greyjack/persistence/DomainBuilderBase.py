@@ -5,7 +5,7 @@ from copy import deepcopy
 
 class DomainBuilderBase(ABC):
     
-    # Default function to build domain model without using existing solution
+    # Default function to build domain model without using existing solution or domain object
     @abstractmethod
     def build_domain_from_scratch(self):
         pass
@@ -14,8 +14,13 @@ class DomainBuilderBase(ABC):
     # post-solving actions (for example: print metrics, check correctness of solution,
     # serializing to JSON the whole domain and sending to another service).
     # means raw solution JSON 
+    # initial_domain - is domain object, that will be updated by values of solution (GJSolution)
+    # WARNING! In a replanning scenario initial_domain=None will (probably) cause incorrect update
+    # due to offset of enities (for example: build_from_scratch() builds 10 vehicles, but domain for 
+    # replanning has 9 vehicles (something was removed, that's why need replanning))
+    # For replanning scenario always write case for processing initial_domain=YOUR_DOMAIN_OBJECT_FOR_REPLANNING
     @abstractmethod
-    def build_from_solution(self, solution):
+    def build_from_solution(self, solution, initial_domain=None):
         pass
 
     # For multistage solving cases, when you need to take solution

@@ -14,15 +14,16 @@ from greyjack.variables.GJInteger import GJInteger
 
 class CotwinBuilder(CotwinBuilderBase):
 
-    def __init__(self, use_incremental_score_calculator):
+    def __init__(self, use_incremental_score_calculator, use_greed_init):
         self.use_incremental_score_calculator = use_incremental_score_calculator
+        self.use_greed_init = use_greed_init
         pass
 
     def build_cotwin(self, domain, is_already_initialized):
 
         vrp_cotwin = VRPCotwin()
 
-        vrp_cotwin.add_planning_entities_list(self._build_planning_stops(domain), "planning_stops")
+        vrp_cotwin.add_planning_entities_list(self._build_planning_stops(domain, is_already_initialized), "planning_stops")
         vrp_cotwin.add_problem_facts_list(self._build_problem_fact_vehicles(domain), "vehicles")
         vrp_cotwin.add_problem_facts_list(self._build_problem_fact_customers(domain), "customers")
 
@@ -46,11 +47,11 @@ class CotwinBuilder(CotwinBuilderBase):
         problem_fact_vehicles = []
         for i, domain_vehicle in enumerate(domain.vehicles):
             vehicle_id = i
-            depot_matrix_id = domain_vehicle.depot_matrix_id
+            depot_vec_id = domain_vehicle.depot_vec_id
             capacity = domain_vehicle.capacity
             work_day_start = domain_vehicle.work_day_start
             work_day_end = domain_vehicle.work_day_end
-            cot_vehicle = CotVehicle( vehicle_id, capacity, depot_matrix_id, work_day_start, work_day_end)
+            cot_vehicle = CotVehicle( vehicle_id, capacity, depot_vec_id, work_day_start, work_day_end)
             problem_fact_vehicles.append( cot_vehicle )
 
         return problem_fact_vehicles
@@ -72,7 +73,7 @@ class CotwinBuilder(CotwinBuilderBase):
 
         return problem_fact_customers
 
-    def _build_planning_stops(self, domain):
+    def _build_planning_stops(self, domain, is_already_initialized):
 
         planning_stops = []
         customers_dict = domain.customers_dict
@@ -80,7 +81,20 @@ class CotwinBuilder(CotwinBuilderBase):
         n_customers = len(customers_dict)
         k_vehicles = len(domain.vehicles)
 
-        initial_vehicle_ids, initial_customer_ids = self.build_greed_initial_ids(domain)
+        initial_vehicle_ids = [None for k in range(n_customers - n_depots)]
+        initial_customer_ids = [None for i in range(n_customers - n_depots)]
+        is_frozen = [False for i in range(n_customers - n_depots)]
+        if is_already_initialized:
+            i = 0
+            for k in range(k_vehicles):
+                vehicle_k = domain.vehicles[k]
+                for customer in vehicle_k.customer_list:
+                    initial_vehicle_ids[i] = k
+                    initial_customer_ids[i] = domain.customers_id_to_vec_id_map[customer.id]
+                    is_frozen[i] = customer.frozen
+                    i += 1
+        elif self.use_greed_init:
+            initial_vehicle_ids, initial_customer_ids = self.build_greed_initial_ids(domain)
 
         for i in range(n_depots, n_customers):
             
@@ -88,13 +102,13 @@ class CotwinBuilder(CotwinBuilderBase):
             #initial_value=i % (k_vehicles-1)
             #initial_value=initial_vehicle_ids[i - n_depots]
             #semantic_groups=["vehicle_assignment", "common"]
-            planning_vehicle_id = GJInteger(0, k_vehicles-1, False, initial_vehicle_ids[i - n_depots], semantic_groups=["vehicle_assignment", "common"])
+            planning_vehicle_id = GJInteger(0, k_vehicles-1, is_frozen[i - n_depots], initial_vehicle_ids[i - n_depots], semantic_groups=["vehicle_assignment", "common"])
 
             #initial_value=None
             #initial_value=i
             #initial_value=initial_customer_ids[i - n_depots]
             #semantic_groups=["customer_assignment", "common"]
-            planning_customer_id = GJInteger(n_depots, n_customers-1, False, initial_customer_ids[i - n_depots], semantic_groups=["customer_assignment", "common"])
+            planning_customer_id = GJInteger(n_depots, n_customers-1, is_frozen[i - n_depots], initial_customer_ids[i - n_depots], semantic_groups=["customer_assignment", "common"])
 
             planning_stop = CotStop(planning_vehicle_id, planning_customer_id)
             planning_stops.append(planning_stop)
@@ -120,7 +134,7 @@ class CotwinBuilder(CotwinBuilderBase):
             if len(remaining_customers) <= 0:
                 break
 
-            vehicle_depot_id = vehicle.depot_matrix_id
+            vehicle_depot_id = vehicle.depot_vec_id
             vehicle_capacity = vehicle.capacity
             collected_demand = 0
             vehicle_stops = []
@@ -191,7 +205,7 @@ class CotwinBuilder(CotwinBuilderBase):
         depot_ids = np.zeros((k_vehicles, ), dtype=np.int64)
         capacities = np.zeros((k_vehicles, ), dtype=np.int64)
         for k in range(k_vehicles):
-            depot_ids[k] = domain.vehicles[k].depot_matrix_id
+            depot_ids[k] = domain.vehicles[k].depot_vec_id
             capacities[k] = domain.vehicles[k].capacity
         score_calculator.utility_objects["depot_ids"] = depot_ids
         score_calculator.utility_objects["vehicle_capacities"] = capacities

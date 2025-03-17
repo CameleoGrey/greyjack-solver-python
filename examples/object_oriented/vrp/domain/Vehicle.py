@@ -2,10 +2,10 @@
 
 class Vehicle():
 
-    def __init__(self, depot, depot_matrix_id, work_day_start, work_day_end, capacity, customer_list, max_stops):
+    def __init__(self, depot, depot_vec_id, work_day_start, work_day_end, capacity, customer_list, max_stops):
 
         self.depot = depot
-        self.depot_matrix_id = depot_matrix_id
+        self.depot_vec_id = depot_vec_id
         self.work_day_start = work_day_start
         self.work_day_end = work_day_end
         self.capacity = capacity

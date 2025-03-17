@@ -11,6 +11,7 @@ import sys
 from greyjack.agents.termination_strategies import *
 from greyjack.agents.base.individuals.Individual import Individual
 from greyjack.agents.base.LoggingLevel import LoggingLevel
+from greyjack.agents.base.GJSolution import GJSolution
 
 current_platform = sys.platform
 
@@ -62,6 +63,7 @@ class Agent():
         self.agent_address_for_other_agents = None
         self.next_agent_address = None
         self.is_master_received_variables_info = False
+        self.is_end = False
 
 
         self.is_linux = True if "linux" in current_platform else False
@@ -104,7 +106,7 @@ class Agent():
         if self.initial_solution is None:
             is_already_initialized = False
             domain = self.domain_builder.build_domain_from_scratch()
-        elif isinstance(self.initial_solution, str):
+        elif isinstance(self.initial_solution, GJSolution):
             is_already_initialized = True
             domain = self.domain_builder.build_from_solution(self.initial_solution)
         else:
@@ -184,6 +186,8 @@ class Agent():
 
                 if self.is_win_from_comparing_with_global or (not self.is_master_received_variables_info):
                     self._check_global_updates()
+                    if self.is_end:
+                        return
             except Exception as e:
                 print(e)
                 exit(-1)
@@ -477,3 +481,4 @@ class Agent():
         
         is_variable_names_received = master_publication[1]
         self.is_master_received_variables_info = is_variable_names_received
+        self.is_end = master_publication[2]

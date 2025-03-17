@@ -47,7 +47,7 @@ class DomainBuilder(DomainBuilderBase):
 
         return domain_model
 
-    def build_from_solution(self, solution):
+    def build_from_solution(self, solution, initial_domain=None):
         
         domain  = self.build_domain_from_scratch()
         path_stop_ids = []
@@ -69,7 +69,7 @@ class DomainBuilder(DomainBuilderBase):
     def _build_distance_matrix(self, locations_list):
 
         @staticmethod
-        @jit()
+        @jit(nopython=True, cache=True)
         def compute_distance_matrix(latitudes, longitudes, n_locations):
             distance_matrix = np.zeros( (n_locations, n_locations), dtype=np.int64 )
             for i in range(n_locations):

@@ -59,7 +59,7 @@ class IncrementalScoreCalculatorTSP(IncrementalScoreCalculator):
         return scores
 
 @staticmethod
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def compute_penalties(changed_stops, current_df_row_ids, current_loc_ids, distance_matrix, last_id, target_stops_count):
     changed_stops[current_df_row_ids] = current_loc_ids
         

@@ -10,6 +10,7 @@ class TabuSearch(Agent):
         tabu_entity_rate,
         mutation_rate_multiplier=None,
         move_probas=None,
+        compare_to_global=False,
         migration_frequency=None,
         termination_strategy=None,
     ):
@@ -21,7 +22,10 @@ class TabuSearch(Agent):
         self.tabu_entity_rate = tabu_entity_rate
         self.mutation_rate_multiplier = mutation_rate_multiplier
         self.move_probas = move_probas
-        self.is_win_from_comparing_with_global = False # Stucks more often in local optimums
+
+        # If true - stucks more often in local minimums, but converges much faster
+        # may be useful in multiple stages solving
+        self.is_win_from_comparing_with_global = compare_to_global
 
     def _build_metaheuristic_base(self):
         self.score_requester = OOPScoreRequester(self.cotwin)

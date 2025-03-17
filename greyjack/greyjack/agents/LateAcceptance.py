@@ -10,7 +10,7 @@ class LateAcceptance(Agent):
         tabu_entity_rate,
         mutation_rate_multiplier=None,
         move_probas=None,
-        migration_frequency=None,
+        migration_frequency=999_999_999_999, # probably, better use only comparing with global. Need more researching.
         termination_strategy=None,
     ):
         

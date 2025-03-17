@@ -2,14 +2,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 class VehicleRoutingPlan():
-    def __init__(self, name, vehicles, customers_dict, depot_dict, distance_matrix, customers_id_to_matrix_id_map, time_windowed):
+    def __init__(self, name, vehicles, customers_dict, depot_dict, distance_matrix, customers_id_to_vec_id_map, time_windowed):
 
         self.name = name
         self.vehicles = vehicles
         self.customers_dict = customers_dict
         self.depot_dict = depot_dict
         self.distance_matrix = distance_matrix
-        self.customers_id_to_matrix_id_map = customers_id_to_matrix_id_map
+        self.customers_id_to_vec_id_map = customers_id_to_vec_id_map
         self.time_windowed = time_windowed
 
         pass

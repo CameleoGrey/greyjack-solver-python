@@ -66,7 +66,7 @@ class PlainScoreCalculatorTSP( PlainScoreCalculator ):
     # numba is perfect for writing small pieces of code (that difficult or imposible to express in Polars) with numpy objects
     # instead rewriting on Rust (to not increase complexity of project and still take huge performance boost)
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def compute_path_distance(planning_stop_ids, distance_matrix):
         current_path_distance = 0
         current_path_distance += distance_matrix[0][planning_stop_ids[0]]
@@ -99,7 +99,7 @@ class PlainScoreCalculatorTSP( PlainScoreCalculator ):
     # numba is perfect for writing small pieces of code (that difficult or imposible to express in Polars) with numpy objects
     # instead rewriting on Rust (to not increase complexity of project and still take huge performance boost)
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def compute_path_distances(data_matrix, distance_matrix):
 
         unique_sample_ids = np.unique(data_matrix[:, 0])

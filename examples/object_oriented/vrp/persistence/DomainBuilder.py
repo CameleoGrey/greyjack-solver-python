@@ -23,9 +23,9 @@ class DomainBuilder(DomainBuilderBase):
         dataset_name = read_file["metadata"]["dataset_name"]
         time_windowed = read_file["metadata"]["time_window_task_type"]
         customers_dict = read_file["customers_dict"]
-        customers_id_to_matrix_id_map = {}
+        customers_id_to_vec_id_map = {}
         for i in range(len(customers_dict)):
-            customers_id_to_matrix_id_map[i] = customers_dict[i].id
+            customers_id_to_vec_id_map[customers_dict[i].id] = i
 
         if "distance_matrix" in read_file:
             distance_matrix = read_file["distance_matrix"]
@@ -49,11 +49,11 @@ class DomainBuilder(DomainBuilderBase):
 
         vehicles_list = []
         for i in range(k_vehicles):
-            depot_matrix_id = i % n_depots
-            depot = customers_dict[depot_matrix_id]
+            depot_vec_id = i % n_depots
+            depot = customers_dict[depot_vec_id]
             work_day_start = depot.time_window_start
             work_day_end = depot.time_window_end
-            vehicle = Vehicle(depot, depot_matrix_id, work_day_start, work_day_end,
+            vehicle = Vehicle(depot, depot_vec_id, work_day_start, work_day_end,
                               vehicles_capacity, None, max_stops)
             vehicles_list.append( vehicle )
 
@@ -62,14 +62,19 @@ class DomainBuilder(DomainBuilderBase):
                                           customers_dict=customers_dict,
                                           depot_dict=depot_dict,
                                           distance_matrix=distance_matrix,
-                                          customers_id_to_matrix_id_map=customers_id_to_matrix_id_map,
+                                          customers_id_to_vec_id_map=customers_id_to_vec_id_map,
                                           time_windowed=time_windowed)
 
         return domain_model
 
-    def build_from_solution(self, solution):
-
-        domain = self.build_domain_from_scratch()
+    def build_from_solution(self, solution, initial_domain=None):
+        
+        if initial_domain is None:
+            domain = self.build_domain_from_scratch()
+        else:
+            domain = initial_domain
+            for k in range(len(domain.vehicles)):
+                domain.vehicles[k].customer_list = []
 
         solution_dict = solution.variable_values_dict
         solution_keys = list(solution_dict.keys())
@@ -92,7 +97,7 @@ class DomainBuilder(DomainBuilderBase):
     def _build_distance_matrix(self, locations_list):
 
         @staticmethod
-        @jit()
+        @jit(nopython=True, cache=True)
         def compute_distance_matrix(latitudes, longitudes, n_locations):
             distance_matrix = np.zeros( (n_locations, n_locations), dtype=np.int64 )
             for i in range(n_locations):
@@ -155,7 +160,7 @@ class DomainBuilder(DomainBuilderBase):
 
         def read_customers_common_info( file_pointer, for_json=False ):
             customers_dict = {}
-            customer_matrix_id = 0
+            customer_vec_id = 0
             readed_line = ""
 
             while True:
@@ -175,7 +180,7 @@ class DomainBuilder(DomainBuilderBase):
                         name = readed_line[3].replace("\n", "")
                     else:
                         name = str(id)
-                    customers_dict[str(customer_matrix_id)] = {
+                    customers_dict[str(customer_vec_id)] = {
                         "id": id,
                         "latitude": latitude,
                         "longitude": longitude,
@@ -190,9 +195,9 @@ class DomainBuilder(DomainBuilderBase):
                     else:
                         name = str(id)
                     current_customer = Customer(id=id, latitude=latitude, longitude=longitude, name=name)
-                    customers_dict[customer_matrix_id] = current_customer
+                    customers_dict[customer_vec_id] = current_customer
 
-                customer_matrix_id += 1
+                customer_vec_id += 1
 
             return customers_dict
 
@@ -216,7 +221,7 @@ class DomainBuilder(DomainBuilderBase):
             return distance_matrix
 
         def read_customers_demand( file_pointer, customers_dict, for_json=False ):
-            customer_matrix_id = 0
+            customer_vec_id = 0
             readed_line = ""
             time_window_task_type = False
 
@@ -230,21 +235,21 @@ class DomainBuilder(DomainBuilderBase):
                 readed_line = readed_line.split(" ")
 
                 if for_json:
-                    customers_dict[str(customer_matrix_id)]["demand"] = float(readed_line[1])
+                    customers_dict[str(customer_vec_id)]["demand"] = float(readed_line[1])
                     if len(readed_line) == 5:
                         time_window_task_type = True
-                        customers_dict[str(customer_matrix_id)]["time_window_start"] = int(readed_line[2])
-                        customers_dict[str(customer_matrix_id)]["time_window_end"] = int(readed_line[3])
-                        customers_dict[str(customer_matrix_id)]["service_time"] = int(readed_line[4].replace("\n", ""))
+                        customers_dict[str(customer_vec_id)]["time_window_start"] = int(readed_line[2])
+                        customers_dict[str(customer_vec_id)]["time_window_end"] = int(readed_line[3])
+                        customers_dict[str(customer_vec_id)]["service_time"] = int(readed_line[4].replace("\n", ""))
                 else:
-                    customers_dict[customer_matrix_id].demand = float(readed_line[1])
+                    customers_dict[customer_vec_id].demand = float(readed_line[1])
                     if len(readed_line) == 5:
                         time_window_task_type = True
-                        customers_dict[customer_matrix_id].time_window_start = int(readed_line[2])
-                        customers_dict[customer_matrix_id].time_window_end = int(readed_line[3])
-                        customers_dict[customer_matrix_id].service_time = int(readed_line[4].replace("\n", ""))
+                        customers_dict[customer_vec_id].time_window_start = int(readed_line[2])
+                        customers_dict[customer_vec_id].time_window_end = int(readed_line[3])
+                        customers_dict[customer_vec_id].service_time = int(readed_line[4].replace("\n", ""))
 
-                customer_matrix_id += 1
+                customer_vec_id += 1
 
             return customers_dict, time_window_task_type
 
@@ -331,7 +336,7 @@ class DomainBuilder(DomainBuilderBase):
         for k, vehicle_json in enumerate(vehicles_json_values):
             vehicle_k = Vehicle(
                 depot = customers_vec[vehicle_json["depot"]["vec_id"]],
-                depot_matrix_id = vehicle_json["depot"]["vec_id"],
+                depot_vec_id = vehicle_json["depot"]["vec_id"],
                 work_day_start = vehicle_json["work_day_start"],
                 work_day_end = vehicle_json["work_day_end"],
                 capacity = vehicle_json["capacity"],
@@ -345,7 +350,7 @@ class DomainBuilder(DomainBuilderBase):
                                           customers_dict=customers_vec,
                                           depot_dict=depot_vec,
                                           distance_matrix=distance_matrix,
-                                          customers_id_to_matrix_id_map=None,
+                                          customers_id_to_vec_id_map=None,
                                           time_windowed=time_windowed)
 
         return domain_model"""
