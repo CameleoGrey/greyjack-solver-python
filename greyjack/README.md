@@ -16,7 +16,7 @@ There are 2 editions of GreyJack Solver:
 
 # Key Features of GreyJack Solver (Rust version)
 
-- **Unmatched Comfort, Expressiveness, Flexibility and speed of developing** Designed to express alomost any optimization problem with maximum comfortability and clarity.
+- **Unmatched Comfort, Expressiveness, Flexibility and speed of developing** Designed to express almost any optimization problem with maximum comfortability and clarity.
 - **Universality** Supports a wide range of constraint problems, including continuous, integer, and mixed-integer challenges. Additionally, thanks to Polars, you can optimize virtually any process that can be represented as table data.
 - **Python's Comfort Meets Rust's Speed** All computationally intensive parts of the solver are implemented in Rust and seamlessly integrated into Python, offering fast development cycles with production-ready performance for ~95% real-world tasks.
 - **Clarity and Simplicity** GreyJack provides a clear and straightforward approach to designing, implementing, and improving effective solutions for nearly any constraint problem and scenario.
