@@ -22,8 +22,8 @@ polars = { version = "0.46.0", features = ["lazy", "ndarray", "serde", "abs"] }
 # if you build lib from source code
 # uncomment to gain max performance (increases calculation speed about 5-10%, 
 # but also increases build time ~20x times)
-#[profile.release]
-#lto = true
-#codegen-units = 1
-#debug = true
-#opt-level = 3
+[profile.release]
+lto = true
+codegen-units = 1
+debug = true
+opt-level = 3

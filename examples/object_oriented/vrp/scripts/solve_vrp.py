@@ -46,7 +46,7 @@ if __name__ == "__main__":
     #termination_strategy = ScoreLimit(score_to_compare=[0])
     agent = TabuSearch(neighbours_count=128, tabu_entity_rate=0.0, 
                        mutation_rate_multiplier=None, move_probas=[0.5, 0.5, 0.0, 0.0, 0.0, 0.0],
-                       compare_to_global=True, migration_frequency=10, termination_strategy=termination_strategy)
+                       compare_to_global=False, migration_frequency=10, termination_strategy=termination_strategy)
     """agent = GeneticAlgorithm(population_size=512, crossover_probability=0.5, p_best_rate=0.2,
                              tabu_entity_rate=0.0, mutation_rate_multiplier=None, move_probas=[0.5, 0.5, 0.0, 0.0, 0.0, 0.0],
                              migration_rate=0.00001, migration_frequency=10, termination_strategy=termination_strategy)"""
@@ -55,8 +55,8 @@ if __name__ == "__main__":
                            termination_strategy=termination_strategy)"""
 
     solver = Solver(domain_builder, cotwin_builder, agent, 
-                    ParallelizationBackend.Threading, LoggingLevel.FreshOnly,
-                    n_jobs=1, score_precision=[0, 0, 0])
+                    ParallelizationBackend.Multiprocessing, LoggingLevel.FreshOnly,
+                    n_jobs=10, score_precision=[0, 0, 0])
     solution = solver.solve()
 
     domain = domain_builder.build_from_solution(solution)
@@ -98,8 +98,8 @@ if __name__ == "__main__":
                        mutation_rate_multiplier=None, move_probas=[0.5, 0.5, 0.0, 0.0, 0.0, 0.0],
                        compare_to_global=True, migration_frequency=10, termination_strategy=termination_strategy)
     solver = Solver(domain_builder, cotwin_builder, agent, 
-                    ParallelizationBackend.Threading, LoggingLevel.FreshOnly,
-                    n_jobs=1, score_precision=[0, 0, 0], 
+                    ParallelizationBackend.Multiprocessing, LoggingLevel.FreshOnly,
+                    n_jobs=10, score_precision=[0, 0, 0], 
                     initial_solution=domain)
     solution = solver.solve()
     domain = domain_builder.build_from_solution(solution, initial_domain=domain)

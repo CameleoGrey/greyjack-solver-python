@@ -5,16 +5,57 @@
 
 _In optimum we trust._
 
-GreyJack Solver is an AI constraint solver for Python (current version) built on top of Polars. 
-It empowers you to solve a wide range of constraint optimization problems, including continuous, integer, and mixed-integer challenges.
+GreyJack Solver is a "jack of all trades" constraint metaheuristic solver for Python, built on the robust foundations of Rust and Polars. It empowers you to tackle a wide array of constraint optimization problems, including continuous, integer, and mixed-integer challenges with ease and efficiency.
 
 # Editions
 
 There are 2 editions of GreyJack Solver:
 
-- [Rust version](https://github.com/CameleoGrey/greyjack-solver-rust/) Ready to use, but there is still a lot of work to "complete" solver.
-- Python version (this repo, developing in progress...).
+- Python edition
+- [Rust edition](https://github.com/CameleoGrey/greyjack-solver-rust)
 
-# Common info
+# Key Features of GreyJack Solver (Rust version)
 
-Developing of Python version is in progress. Repo is public to bind repo name, pip package name and show, that there will be something more than only Rust version.
+- **Unmatched Comfort, Expressiveness, Flexibility and speed of developing** Designed to express alomost any optimization problem with maximum comfortability and clarity.
+- **Universality** Supports a wide range of constraint problems, including continuous, integer, and mixed-integer challenges. Additionally, thanks to Polars, you can optimize virtually any process that can be represented as table data.
+- **Python's Comfort Meets Rust's Speed** All computationally intensive parts of the solver are implemented in Rust and seamlessly integrated into Python, offering fast development cycles with production-ready performance for ~95% real-world tasks.
+- **Clarity and Simplicity** GreyJack provides a clear and straightforward approach to designing, implementing, and improving effective solutions for nearly any constraint problem and scenario.
+- **Nearly Linear Horizontal Scaling** The multi-threaded solving process is organized as a collective effort of individual agents (using the island computation model for all algorithms), which share results with neighbors during solving. This approach ensures nearly linear horizontal scaling, enhancing both the quality and speed of solutions (depending on agent settings and the problem at hand).
+- **Support for Population and Local Search Algorithms** GreyJack Solver supports a wide range of metaheuristics, including population-based and local search algorithms, with highly flexible settings. You can easily find, select, and configure the approach that best fits your problem, delivering optimal results.
+- **Easy Integration**  The observer mechanism (see examples) simplifies integration, making it straightforward to incorporate GreyJack Solver into your existing workflows..
+
+# Get started with GreyJack Solver in Rust
+
+```
+pip install greyjack
+```
+
+- Explore examples. Docs and guides will be later. GreyJack is very intuitively understandable solver (even Rust version).
+- Simply solve your tasks simply.
+
+# Install GreyJack Solver from source
+
+- Be sure that you've installed Rust (rustup) and Python on your machine.
+```
+- (create venv, activate it, cd greyjack-solver-python/greyjack)
+pip install maturin
+maturin develop --release
+```
+-  maturin will build the Rust part, get all Python dependencies (for solver itself, not examples) and install greyjack to your venv
+
+# RoadMap
+
+- SimulatedAnnealing
+- API for modelling pure math problems (classic solvers like)
+- Modern variations (modifications) of LSHADE (Differential evolution algorithms often appear in articles as sota approaches)
+- CMA, probably its modern variants, adaptations for tasks with integer and categorical variables (often appears in articles as sota approach)
+- Add more examples: Job-Shop, Pickup&Delivery, some continuous and MIP tasks, scheduling, etc
+- Composite termination criterion (for example: solving limit minutes N AND score not improving M seconds)
+- Multi-level score
+- Custom moves support
+- Try to impove incremental (pseudo-incremental) score calculation mechanism (caching, no clonning, etc)
+- Write docs
+- Website
+- Useful text materials, guides, presentations
+- Tests, tests, tests...
+- Score explainer / interpreter

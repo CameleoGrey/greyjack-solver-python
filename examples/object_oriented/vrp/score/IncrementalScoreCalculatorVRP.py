@@ -40,7 +40,8 @@ class IncrementalScoreCalculatorVRP(IncrementalScoreCalculator):
             time_window_ends = self.utility_objects["time_window_ends"]
             service_times = self.utility_objects["service_times"]
         else:
-            # to not catch error in the not time_windowed scenario
+            # to not catch error in the not time_windowed scenario 
+            # (jitted function needs types anyway)
             work_day_starts = np.zeros((1,), dtype=np.int64)
             work_day_ends = np.zeros((1,), dtype=np.int64)
             time_window_starts = np.zeros((1,), dtype=np.int64)
