@@ -30,10 +30,13 @@ build_concrete_genetic_algorithm_base!(GeneticAlgorithmSimple, IndividualSimple,
 build_concrete_genetic_algorithm_base!(GeneticAlgorithmHardSoft, IndividualHardSoft, HardSoftScore);
 build_concrete_genetic_algorithm_base!(GeneticAlgorithmHardMediumSoft, IndividualHardMediumSoft, HardMediumSoftScore);
 
-
 build_concrete_late_acceptance_base!(LateAcceptanceSimple, IndividualSimple, SimpleScore);
 build_concrete_late_acceptance_base!(LateAcceptanceHardSoft, IndividualHardSoft, HardSoftScore);
 build_concrete_late_acceptance_base!(LateAcceptanceHardMediumSoft, IndividualHardMediumSoft, HardMediumSoftScore);
+
+build_concrete_simulated_annealing_base!(SimulatedAnnealingSimple, IndividualSimple, SimpleScore);
+build_concrete_simulated_annealing_base!(SimulatedAnnealingHardSoft, IndividualHardSoft, HardSoftScore);
+build_concrete_simulated_annealing_base!(SimulatedAnnealingHardMediumSoft, IndividualHardMediumSoft, HardMediumSoftScore);
 
 
 
@@ -67,6 +70,9 @@ fn greyjack(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<LateAcceptanceSimple>()?;
     m.add_class::<LateAcceptanceHardSoft>()?;
     m.add_class::<LateAcceptanceHardMediumSoft>()?;
+    m.add_class::<SimulatedAnnealingSimple>()?;
+    m.add_class::<SimulatedAnnealingHardSoft>()?;
+    m.add_class::<SimulatedAnnealingHardMediumSoft>()?;
 
     Ok(())
 }

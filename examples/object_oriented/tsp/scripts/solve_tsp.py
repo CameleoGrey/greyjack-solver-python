@@ -37,10 +37,10 @@ if __name__ == "__main__":
     cotwin_builder = CotwinBuilder(use_incremental_score_calculator=True)
 
     #termination_strategy = StepsLimit(step_count_limit=1000)
-    #termination_strategy = TimeSpentLimit(time_seconds_limit=60)
-    termination_strategy = ScoreNoImprovement(time_seconds_limit=15)
+    termination_strategy = TimeSpentLimit(time_seconds_limit=60)
+    #termination_strategy = ScoreNoImprovement(time_seconds_limit=15)
     #termination_strategy = ScoreLimit(score_to_compare=[0])
-    agent = TabuSearch(neighbours_count=128, tabu_entity_rate=0.2, 
+    agent = TabuSearch(neighbours_count=128, tabu_entity_rate=0.5, 
                        mutation_rate_multiplier=None, move_probas=[0.0, 0.2, 0.2, 0.2, 0.2, 0.2],
                        compare_to_global=False, migration_frequency=10, termination_strategy=termination_strategy)
     """agent = GeneticAlgorithm(population_size=128, crossover_probability=0.5, p_best_rate=0.05,
@@ -49,9 +49,12 @@ if __name__ == "__main__":
     """agent = LateAcceptance(late_acceptance_size=64, tabu_entity_rate=0.2, 
                            mutation_rate_multiplier=None, move_probas=[0.0, 0.2, 0.2, 0.2, 0.2, 0.2], 
                            termination_strategy=termination_strategy)"""
+    """agent = SimulatedAnnealing(initial_temperature=[1.0, 1.0], cooling_rate=0.9999, tabu_entity_rate=0.2, 
+                               mutation_rate_multiplier=None, move_probas=[0, 0.2, 0.2, 0.2, 0.2, 0.2], 
+                               compare_to_global=True, migration_frequency=10, termination_strategy=termination_strategy)"""
 
     solver = Solver(domain_builder, cotwin_builder, agent, 
-                    ParallelizationBackend.Multiprocessing, LoggingLevel.FreshOnly,
+                    ParallelizationBackend.Multiprocessing, LoggingLevel.Info,
                     n_jobs=10, score_precision=[0, 0])
     solution = solver.solve()
 

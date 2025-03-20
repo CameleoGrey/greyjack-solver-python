@@ -5,6 +5,7 @@ from greyjack.score_calculation.scores.HardMediumSoftScore import HardMediumSoft
 from greyjack.score_calculation.scores.ScoreVariants import ScoreVariants
 import polars as pl
 from numba import jit
+#from numba import cuda # there is possibility to write some constraints on gpu outside Polars engine
 
 class PlainScoreCalculatorVRP(PlainScoreCalculator):
 
@@ -30,10 +31,13 @@ class PlainScoreCalculatorVRP(PlainScoreCalculator):
 
         customers_df = customers_df.rename({"customer_vec_id": "customer_id"})
         common_df = (planning_stops_df
-                      .with_row_index("index", offset=None)
-                      .join(vehicle_df, on="vehicle_id", how="inner")
-                      .join(customers_df, on="customer_id", how="inner")
-                      .sort(["sample_id", "vehicle_id", "index"], descending=[False, False, False]))
+                    .lazy()
+                    .with_row_index("index", offset=None)
+                    .join(vehicle_df.lazy(), on="vehicle_id", how="inner")
+                    .join(customers_df.lazy(), on="customer_id", how="inner")
+                    .sort(["sample_id", "vehicle_id", "index"], descending=[False, False, False])
+                    .collect() # you can use engine="gpu" on Linux or by WSL
+                    )
 
         self.utility_objects["common_df"] = common_df
         
@@ -45,11 +49,13 @@ class PlainScoreCalculatorVRP(PlainScoreCalculator):
 
         duplicate_counts = (
             path_stops_df
+            .lazy()
             .group_by("sample_id")
             .agg((pl.col("customer_id").count() - pl.col("customer_id").n_unique()).alias("duplicates_count"))
             .group_by("sample_id")
             .agg(pl.col("duplicates_count").sum())
             .sort("sample_id")
+            .collect() # you can use engine="gpu" on Linux or by WSL
         )
 
         scores = duplicate_counts["duplicates_count"].to_numpy()
@@ -64,13 +70,15 @@ class PlainScoreCalculatorVRP(PlainScoreCalculator):
 
         capacity_penalties = (
             common_df
+            .lazy()
             .group_by(["sample_id", "vehicle_id"])
             .agg(pl.col("demand").sum().alias("sum_trip_demand"))
-            .join(vehicle_df, on="vehicle_id", how="inner")
+            .join(vehicle_df.lazy(), on="vehicle_id", how="inner")
             .with_columns((pl.col("capacity") - pl.col("sum_trip_demand")).alias("capacity_difference"))
             .filter(pl.col("capacity_difference") < 0)
             .group_by("sample_id")
             .agg(pl.col("capacity_difference").abs().sum().alias("capacity_constraint_penalty"))
+            .collect() # you can use engine="gpu" on Linux or by WSL
         )
 
         bad_sample_ids = capacity_penalties["sample_id"].to_list()

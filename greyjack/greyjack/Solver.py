@@ -165,7 +165,7 @@ class Solver():
             steps_count += 1
             new_best_string = "New best score!" if new_best_flag else ""
             if self.logging_level == LoggingLevel.FreshOnly and new_best_flag:
-                self.logger.info(f"Solutions received: {steps_count} Best score: {self.global_top_individual.score}, Solving time: {total_time:.6f} {new_best_string}")
+                self.logger.info(f"Agent: {agent_id:4} Step {local_step} Best score: {self.global_top_individual.score}, Solving time: {total_time:.6f} {new_best_string}")
 
             if len(self.observers) >= 1:
                 self._notify_observers(self.global_top_individual)

@@ -117,7 +117,7 @@ class Agent():
     
     def _define_individual_type(self):
         self.score_variant = self.cotwin.score_calculator.score_variant
-        self.individual_type = Individual.get_related_individual_type(self.cotwin.score_calculator.score_variant)
+        self.individual_type = Individual.get_related_individual_type(self.score_variant)
     
     # implements by concrete metaheuristics
     def _build_metaheuristic_base(self):

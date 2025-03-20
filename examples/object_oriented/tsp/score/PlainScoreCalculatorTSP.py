@@ -5,6 +5,7 @@ from greyjack.score_calculation.scores.HardSoftScore import HardSoftScore
 from greyjack.score_calculation.scores.ScoreVariants import ScoreVariants
 import polars as pl
 from numba import jit
+#from numba import cuda # there is possibility to write some constraints on gpu outside Polars engine
 
 class PlainScoreCalculatorTSP( PlainScoreCalculator ):
 
@@ -27,12 +28,13 @@ class PlainScoreCalculatorTSP( PlainScoreCalculator ):
 
         duplicate_counts = (
             path_stops_df
+            .lazy()
             .group_by("sample_id")
             .agg((pl.col("location_list_id").count() - pl.col("location_list_id").n_unique()).alias("duplicates_count"))
             .group_by("sample_id")
             .agg(pl.col("duplicates_count").sum())
             .sort("sample_id")
-
+            .collect() # you can use engine="gpu" on Linux or by WSL
         )
 
         scores = duplicate_counts["duplicates_count"].to_list()
@@ -100,6 +102,7 @@ class PlainScoreCalculatorTSP( PlainScoreCalculator ):
     # instead rewriting on Rust (to not increase complexity of project and still take huge performance boost)
     @staticmethod
     @jit(nopython=True, cache=True)
+    #@cuda.jit()
     def compute_path_distances(data_matrix, distance_matrix):
 
         unique_sample_ids = np.unique(data_matrix[:, 0])

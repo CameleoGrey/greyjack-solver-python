@@ -14,7 +14,7 @@ There are 2 editions of GreyJack Solver:
 - Python edition
 - [Rust edition](https://github.com/CameleoGrey/greyjack-solver-rust)
 
-# Key Features of GreyJack Solver (Rust version)
+# Key Features of GreyJack Solver
 
 - **Unmatched Comfort, Expressiveness, Flexibility and speed of developing** Designed to express almost any optimization problem with maximum comfortability and clarity.
 - **Universality** Supports a wide range of constraint problems, including continuous, integer, and mixed-integer challenges. Additionally, thanks to Polars, you can optimize virtually any process that can be represented as table data.
@@ -24,7 +24,7 @@ There are 2 editions of GreyJack Solver:
 - **Support for Population and Local Search Algorithms** GreyJack Solver supports a wide range of metaheuristics, including population-based and local search algorithms, with highly flexible settings. You can easily find, select, and configure the approach that best fits your problem, delivering optimal results.
 - **Easy Integration**  The observer mechanism (see examples) simplifies integration, making it straightforward to incorporate GreyJack Solver into your existing workflows..
 
-# Get started with GreyJack Solver in Rust
+# Get started with GreyJack Solver
 
 ```
 pip install greyjack
@@ -45,7 +45,6 @@ maturin develop --release
 
 # RoadMap
 
-- SimulatedAnnealing
 - API for modelling pure math problems (classic solvers like)
 - Modern variations (modifications) of LSHADE (Differential evolution algorithms often appear in articles as sota approaches)
 - CMA, probably its modern variants, adaptations for tasks with integer and categorical variables (often appears in articles as sota approach)

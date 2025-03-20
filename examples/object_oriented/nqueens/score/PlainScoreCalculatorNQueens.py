@@ -39,7 +39,7 @@ class PlainScoreCalculatorNQueens(PlainScoreCalculator):
             )
             .with_columns((pl.col("row_conflicts_count") + pl.col("desc_conflicts_count") + pl.col("asc_conflicts_count")).alias("sum_conflicts"))
             .sort("sample_id")
-            .collect()
+            .collect() # you can use engine="gpu" on Linux or by WSL
         )
         
         scores = same_row_id_counts["sum_conflicts"].to_list()
