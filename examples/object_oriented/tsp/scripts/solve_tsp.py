@@ -42,7 +42,7 @@ if __name__ == "__main__":
     #termination_strategy = ScoreLimit(score_to_compare=[0])
     agent = TabuSearch(neighbours_count=128, tabu_entity_rate=0.5, 
                        mutation_rate_multiplier=None, move_probas=[0.0, 0.2, 0.2, 0.2, 0.2, 0.2],
-                       compare_to_global=False, migration_frequency=10, termination_strategy=termination_strategy)
+                       migration_frequency=10, termination_strategy=termination_strategy)
     """agent = GeneticAlgorithm(population_size=128, crossover_probability=0.5, p_best_rate=0.05,
                              tabu_entity_rate=0.2, mutation_rate_multiplier=1.0, move_probas=[0.0, 0.2, 0.2, 0.2, 0.2, 0.2],
                              migration_rate=0.00001, migration_frequency=10, termination_strategy=termination_strategy)"""
@@ -51,7 +51,7 @@ if __name__ == "__main__":
                            termination_strategy=termination_strategy)"""
     """agent = SimulatedAnnealing(initial_temperature=[1.0, 1.0], cooling_rate=0.9999, tabu_entity_rate=0.2, 
                                mutation_rate_multiplier=None, move_probas=[0, 0.2, 0.2, 0.2, 0.2, 0.2], 
-                               compare_to_global=True, migration_frequency=10, termination_strategy=termination_strategy)"""
+                               migration_frequency=10, termination_strategy=termination_strategy)"""
 
     solver = Solver(domain_builder, cotwin_builder, agent, 
                     ParallelizationBackend.Multiprocessing, LoggingLevel.Info,
@@ -61,6 +61,6 @@ if __name__ == "__main__":
     domain = domain_builder.build_from_solution(solution)
     domain.print_metrics()
     domain.print_path()
-    domain.plot_path()
+    #domain.plot_path()
 
     print("done")

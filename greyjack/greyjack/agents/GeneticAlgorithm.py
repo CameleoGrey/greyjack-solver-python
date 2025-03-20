@@ -11,7 +11,7 @@ class GeneticAlgorithm(Agent):
         migration_rate=0.00001, migration_frequency=10, termination_strategy=None,
     ):
         
-        super().__init__(migration_rate, migration_frequency, termination_strategy)
+        super().__init__(migration_rate, migration_frequency, termination_strategy, compare_to_global_frequency=1)
 
         self.population_size = population_size
         self.crossover_probability = crossover_probability

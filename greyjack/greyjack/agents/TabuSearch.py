@@ -10,12 +10,12 @@ class TabuSearch(Agent):
         tabu_entity_rate,
         mutation_rate_multiplier=None,
         move_probas=None,
-        compare_to_global=False,
         migration_frequency=None,
+        compare_to_global_frequency=1, # Tabu is usually not too fast-stepping due to high neighbours_count
         termination_strategy=None,
     ):
         
-        super().__init__(1.0, migration_frequency, termination_strategy)
+        super().__init__(1.0, migration_frequency, termination_strategy, compare_to_global_frequency)
 
         self.population_size = 1
         self.neighbours_count = neighbours_count
@@ -25,7 +25,7 @@ class TabuSearch(Agent):
 
         # If true - stucks more often in local minimums, but converges much faster
         # may be useful in multiple stages solving
-        self.is_win_from_comparing_with_global = compare_to_global
+        self.is_win_from_comparing_with_global = True
 
     def _build_metaheuristic_base(self):
         self.score_requester = OOPScoreRequester(self.cotwin)

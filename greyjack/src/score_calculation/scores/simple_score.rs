@@ -34,54 +34,54 @@ impl SimpleScore {
         self.simple_value = value;
     }
 
-    fn get_sum_abs(&self) -> f64 {
+    pub fn get_sum_abs(&self) -> f64 {
         self.simple_value.abs()
     }
 
-    fn get_priority_score(&self) -> f64 {
+    pub fn get_priority_score(&self) -> f64 {
         self.simple_value
     }
 
-    fn get_fitness_value(&self) -> f64 {
+    pub fn get_fitness_value(&self) -> f64 {
         1.0 - (1.0 / (self.simple_value + 1.0))
     }
 
     #[staticmethod]
-    fn get_null_score() -> Self {
+    pub fn get_null_score() -> Self {
         SimpleScore {
             simple_value: 0.0
         }
     }
 
     #[staticmethod]
-    fn get_stub_score() -> Self {
+    pub fn get_stub_score() -> Self {
         SimpleScore {
             simple_value: f64::MAX - 1.0
         }
     }
 
-    fn mul(&self, scalar: f64) -> Self {
+    pub fn mul(&self, scalar: f64) -> Self {
         SimpleScore {
             simple_value: scalar * self.simple_value,
         }
     }
 
     #[staticmethod]
-    fn precision_len() -> usize {
+    pub fn precision_len() -> usize {
         1
     }
 
-    fn round(&mut self, precision: Vec<u64>) {
+    pub fn round(&mut self, precision: Vec<u64>) {
         self.simple_value = round(self.simple_value, precision[0]);
     }
 
-    fn __add__(&self, rhs: &Self) -> Self {
+    pub fn __add__(&self, rhs: &Self) -> Self {
         Self {
             simple_value: self.simple_value + rhs.simple_value,
         }
     }
     
-    fn __repr__(&self) -> String {
+    pub fn __repr__(&self) -> String {
         return self.simple_value.to_string();
     }
 

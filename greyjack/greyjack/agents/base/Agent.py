@@ -17,7 +17,7 @@ current_platform = sys.platform
 
 class Agent():
 
-    def __init__(self, migration_rate, migration_frequency, termination_strategy):
+    def __init__(self, migration_rate, migration_frequency, termination_strategy, compare_to_global_frequency):
 
         if termination_strategy is None:
             raise Exception("Agent's termination_strategy is None.")
@@ -40,6 +40,8 @@ class Agent():
         self.migration_rate = migration_rate
         self.migration_frequency = migration_frequency
         self.steps_to_send_updates = migration_frequency
+        self.compare_to_global_frequency = compare_to_global_frequency
+        self.steps_to_compare_with_global = compare_to_global_frequency
         self.agent_status = "alive"
         self.is_last_message_shown = False
         self.round_robin_status_dict = {}
@@ -182,12 +184,15 @@ class Agent():
                         self.logger.warning(f"Agent: {self.agent_id:4} has successfully terminated work. Now it's just transmitting updates between its neighbours until at least one agent is alive.")
                         self.is_last_message_shown = True
 
-                self._send_candidate_to_master(step_id)
+                self.steps_to_compare_with_global -= 1
+                if self.steps_to_compare_with_global <= 0:
+                    self._send_candidate_to_master(step_id)
 
-                if self.is_win_from_comparing_with_global or (not self.is_master_received_variables_info):
-                    self._check_global_updates()
-                    if self.is_end:
-                        return
+                    if self.is_win_from_comparing_with_global or (not self.is_master_received_variables_info):
+                        self._check_global_updates()
+                        if self.is_end:
+                            return
+                    self.steps_to_compare_with_global = self.compare_to_global_frequency
             except Exception as e:
                 print(e)
                 exit(-1)

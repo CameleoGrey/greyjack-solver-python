@@ -58,11 +58,11 @@ impl HardMediumSoftScore {
         self.soft_score = value;
     }
 
-    fn get_sum_abs(&self) -> f64 {
+    pub fn get_sum_abs(&self) -> f64 {
         self.hard_score.abs() + self.medium_score.abs() + self.soft_score.abs()
     }
 
-    fn get_priority_score(&self) -> f64 {
+    pub fn get_priority_score(&self) -> f64 {
         if self.hard_score > 0.0 {
             return self.hard_score;
         } else if self.medium_score > 0.0{
@@ -72,7 +72,7 @@ impl HardMediumSoftScore {
         }
     }
 
-    fn get_fitness_value(&self) -> f64 {
+    pub fn get_fitness_value(&self) -> f64 {
         let hard_fitness = 1.0 - (1.0 / (self.hard_score + 1.0));
         let medium_fitness = 1.0 - (1.0 / (self.medium_score + 1.0));
         let soft_fitness = 1.0 - (1.0 / (self.soft_score + 1.0));
@@ -82,7 +82,7 @@ impl HardMediumSoftScore {
     }
 
     #[staticmethod]
-    fn get_null_score() -> Self {
+    pub fn get_null_score() -> Self {
         HardMediumSoftScore {
             hard_score: 0.0,
             medium_score: 0.0,
@@ -91,7 +91,7 @@ impl HardMediumSoftScore {
     }
 
     #[staticmethod]
-    fn get_stub_score() -> Self {
+    pub fn get_stub_score() -> Self {
         HardMediumSoftScore {
             hard_score: f64::MAX - 1.0,
             medium_score: f64::MAX - 1.0,
@@ -99,7 +99,7 @@ impl HardMediumSoftScore {
         }
     }
 
-    fn mul(&self, scalar: f64) -> Self {
+    pub fn mul(&self, scalar: f64) -> Self {
         HardMediumSoftScore {
             hard_score: scalar * self.hard_score,
             medium_score: scalar * self.medium_score,
@@ -108,17 +108,17 @@ impl HardMediumSoftScore {
     }
 
     #[staticmethod]
-    fn precision_len() -> usize {
+    pub fn precision_len() -> usize {
         3
     }
 
-    fn round(&mut self, precision: Vec<u64>) {
+    pub fn round(&mut self, precision: Vec<u64>) {
         self.hard_score = round(self.hard_score, precision[0]);
         self.medium_score = round(self.medium_score, precision[1]);
         self.soft_score = round(self.soft_score, precision[2]);
     }
 
-    fn __add__(&self, rhs: &Self) -> Self {
+    pub fn __add__(&self, rhs: &Self) -> Self {
         Self {
             hard_score: self.hard_score + rhs.hard_score,
             medium_score: self.medium_score + rhs.medium_score,
@@ -126,7 +126,7 @@ impl HardMediumSoftScore {
         }
     }
     
-    fn __repr__(&self) -> String {
+    pub fn __repr__(&self) -> String {
         return self.hard_score.to_string() + " | " + &self.medium_score.to_string() + " | " + &self.soft_score.to_string();
     }
 

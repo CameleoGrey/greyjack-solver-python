@@ -6,6 +6,7 @@ from greyjack.score_calculation.scores.ScoreVariants import ScoreVariants
 from greyjack.agents.base.individuals.IndividualSimple import IndividualSimple
 from greyjack.agents.base.individuals.IndividualHardSoft import IndividualHardSoft
 from greyjack.agents.base.individuals.IndividualHardMediumSoft import IndividualHardMediumSoft
+from greyjack.greyjack import sum_simple_scores, sum_hard_soft_scores, sum_hard_medium_soft_scores
 
 class IncrementalScoreCalculator:
     def __init__(self):
@@ -17,6 +18,8 @@ class IncrementalScoreCalculator:
         self.score_type = None
         self.score_variant = None
         self.is_incremental = True
+        self.constraints_names_list = None
+        self.scores_summation_function = None
 
     def add_constraint(self, constraint_name, constraint_function):
         self.constraints[constraint_name] = constraint_function
@@ -51,27 +54,21 @@ class IncrementalScoreCalculator:
         else:
             if self.score_variant == ScoreVariants.SimpleScore:
                 self.score_type = SimpleScore
+                self.scores_summation_function = sum_simple_scores
             if self.score_variant == ScoreVariants.HardSoftScore:
                 self.score_type = HardSoftScore
+                self.scores_summation_function = sum_hard_soft_scores
             if self.score_variant == ScoreVariants.HardMediumSoftScore:
                 self.score_type = HardMediumSoftScore
+                self.scores_summation_function = sum_hard_medium_soft_scores
 
         for prescoring_function in self.prescoring_functions.values():
-            prescoring_function(planning_entity_dfs, problem_fact_dfs, delta_dfs)
+            prescoring_function(planning_entity_dfs, problem_fact_dfs)
 
-        constraints_names_list = list(self.constraints.keys())
-        scores_vec = [self.constraints[name](planning_entity_dfs, problem_fact_dfs, delta_dfs) for name in constraints_names_list]
-
-        constraints_count = len(scores_vec)
-        samples_count = len(scores_vec[0]) if scores_vec else 0
-        scores = []
-
-        for j in range(samples_count):
-            sample_sum_score = self.score_type.get_null_score()
-            for i in range(constraints_count):
-                constraint_weight = self.constraint_weights[constraints_names_list[i]]
-                weighted_score = scores_vec[i][j].mul(constraint_weight)
-                sample_sum_score = sample_sum_score + weighted_score
-            scores.append(sample_sum_score)
+        if self.constraints_names_list is None:
+            self.constraints_names_list = list(self.constraints.keys())
+            
+        scores_vec = [self.constraints[name](planning_entity_dfs, problem_fact_dfs, delta_dfs) for name in self.constraints_names_list]
+        scores = self.scores_summation_function(scores_vec, self.constraint_weights, self.constraints_names_list)
 
         return scores

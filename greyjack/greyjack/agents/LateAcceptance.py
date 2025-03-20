@@ -11,10 +11,11 @@ class LateAcceptance(Agent):
         mutation_rate_multiplier=None,
         move_probas=None,
         migration_frequency=999_999_999_999, # probably, better use only comparing with global. Need more researching.
+        compare_to_global_frequency=10, # too often comparing significally decreases common performance for fast-stepping metaheuristics
         termination_strategy=None,
     ):
         
-        super().__init__(1.0, migration_frequency, termination_strategy)
+        super().__init__(1.0, migration_frequency, termination_strategy, compare_to_global_frequency)
 
         self.population_size = 1
         self.late_acceptance_size = late_acceptance_size

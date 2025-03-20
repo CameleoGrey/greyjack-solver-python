@@ -38,6 +38,10 @@ build_concrete_simulated_annealing_base!(SimulatedAnnealingSimple, IndividualSim
 build_concrete_simulated_annealing_base!(SimulatedAnnealingHardSoft, IndividualHardSoft, HardSoftScore);
 build_concrete_simulated_annealing_base!(SimulatedAnnealingHardMediumSoft, IndividualHardMediumSoft, HardMediumSoftScore);
 
+build_concrete_sum_scores_function!(sum_simple_scores, SimpleScore);
+build_concrete_sum_scores_function!(sum_hard_soft_scores, HardSoftScore);
+build_concrete_sum_scores_function!(sum_hard_medium_soft_scores, HardMediumSoftScore);
+
 
 
 #[pymodule]
@@ -73,6 +77,10 @@ fn greyjack(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<SimulatedAnnealingSimple>()?;
     m.add_class::<SimulatedAnnealingHardSoft>()?;
     m.add_class::<SimulatedAnnealingHardMediumSoft>()?;
+
+    let _ = m.add_function(wrap_pyfunction!(sum_simple_scores, m)?);
+    let _ = m.add_function(wrap_pyfunction!(sum_hard_soft_scores, m)?);
+    let _ = m.add_function(wrap_pyfunction!(sum_hard_medium_soft_scores, m)?);
 
     Ok(())
 }
