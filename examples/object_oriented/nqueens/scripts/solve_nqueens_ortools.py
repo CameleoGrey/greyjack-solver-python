@@ -71,7 +71,7 @@ def main(board_size: int) -> None:
 
 if __name__ == "__main__":
     # By default, solve the 8x8 problem.
-    size = 1024
+    size = 256
     if len(sys.argv) > 1:
         size = int(sys.argv[1])
     main(size)

@@ -1,5 +1,5 @@
 
-import orjson
+import pickle
 import time
 import random
 import uuid
@@ -255,7 +255,7 @@ class Solver():
     def receive_agent_publication(self):
 
         agent_publication = self.master_to_agents_subscriber_socket.recv()
-        agent_publication = orjson.loads(agent_publication)
+        agent_publication = pickle.loads(agent_publication)
         agent_id = agent_publication["agent_id"]
         agent_status = agent_publication["status"]
         local_step = agent_publication["step"]
@@ -276,7 +276,7 @@ class Solver():
         else:
             master_publication = [None, self.is_variables_info_received, is_end]
 
-        master_publication = orjson.dumps(master_publication)
+        master_publication = pickle.dumps(master_publication)
         self.master_to_agents_publisher_socket.send( master_publication )
 
     def update_global_top_solution(self):

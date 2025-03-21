@@ -3,7 +3,7 @@ import numpy as np
 import random
 import logging
 import math
-import orjson
+import pickle
 import time
 import zmq
 import sys
@@ -143,7 +143,7 @@ class Agent():
             self.steps_to_send_updates = self.migration_frequency
             self.termination_strategy.update( self )
         except Exception as e:
-            print(e)
+            self.logger.error(f"{e}")
             exit(-1)
 
         step_id = 0
@@ -157,7 +157,7 @@ class Agent():
                     else: 
                         self._step_plain()
             except Exception as e:
-                print(e)
+                self.logger.error(f"{e}")
                 exit(-1)
             
             try:
@@ -194,7 +194,7 @@ class Agent():
                             return
                     self.steps_to_compare_with_global = self.compare_to_global_frequency
             except Exception as e:
-                print(e)
+                self.logger.error(f"{e}")
                 exit(-1)
     
     def _init_population(self):
@@ -260,7 +260,7 @@ class Agent():
 
     def _send_updates_universal(self):
 
-        ready_to_send_request = orjson.dumps( "ready to send updates" )
+        ready_to_send_request = pickle.dumps( "ready to send updates" )
         self.agent_to_agent_socket_sender.connect(self.next_agent_address)
         self.agent_to_agent_socket_sender.send( ready_to_send_request )
         #request_count_limit = 3
@@ -296,7 +296,7 @@ class Agent():
             else:
                 request["history_archive"] = None
 
-        request_serialized = orjson.dumps(request)
+        request_serialized = pickle.dumps(request)
         try:
             self.agent_to_agent_socket_sender.connect(self.next_agent_address)
             self.agent_to_agent_socket_sender.send( request_serialized )
@@ -304,7 +304,7 @@ class Agent():
         except Exception as e:
             self.logger.error(e)
             return
-        reply = orjson.loads( reply )
+        reply = pickle.loads( reply )
 
         return reply
 
@@ -315,19 +315,19 @@ class Agent():
         except Exception as e:
             self.logger.error(e)
             self.logger.error("failed to receive update")
-            self.agent_to_agent_socket_receiver.send(orjson.dumps("Failed to receive updates"))
+            self.agent_to_agent_socket_receiver.send(pickle.dumps("Failed to receive updates"))
             return
-        self.agent_to_agent_socket_receiver.send(orjson.dumps("{}".format(self.agent_id)))
+        self.agent_to_agent_socket_receiver.send(pickle.dumps("{}".format(self.agent_id)))
 
         try:
             updates_reply = self.agent_to_agent_socket_receiver.recv()
         except Exception as e:
             self.logger.error(e)
             self.logger.error("failed to receive")
-            self.agent_to_agent_socket_receiver.send(orjson.dumps("Failed to receive updates"))
+            self.agent_to_agent_socket_receiver.send(pickle.dumps("Failed to receive updates"))
             return
-        self.agent_to_agent_socket_receiver.send(orjson.dumps("Successfully received updates"))
-        updates_reply = orjson.loads( updates_reply )
+        self.agent_to_agent_socket_receiver.send(pickle.dumps("Successfully received updates"))
+        updates_reply = pickle.loads( updates_reply )
 
         if self.metaheuristic_base.metaheuristic_name == "LSHADE":
             history_migrant = updates_reply["history_archive"]
@@ -465,7 +465,7 @@ class Agent():
         else:
             agent_publication["variable_names"] = self.score_requester.variables_manager.get_variables_names_vec()
             agent_publication["discrete_ids"] = self.score_requester.variables_manager.discrete_ids
-        agent_publication = orjson.dumps( agent_publication )
+        agent_publication = pickle.dumps( agent_publication )
         self.agent_to_master_socket_publisher.send( agent_publication )
 
     def _check_global_updates(self):
@@ -475,7 +475,7 @@ class Agent():
 
     def _check_global_updates_universal(self):
         master_publication = self.agent_to_master_subscriber_socket.recv()
-        master_publication = orjson.loads(master_publication)
+        master_publication = pickle.loads(master_publication)
 
         if self.is_win_from_comparing_with_global:
             global_top_individual = master_publication[0]

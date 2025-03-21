@@ -21,11 +21,11 @@ class Individual:
 
     def get_related_individual_type_by_value(score_variant_value):
 
-        if score_variant_value == ScoreVariants.SimpleScore.value:
+        if score_variant_value == ScoreVariants.SimpleScore:
             return IndividualSimple
-        if score_variant_value == ScoreVariants.HardSoftScore.value:
+        if score_variant_value == ScoreVariants.HardSoftScore:
             return IndividualHardSoft
-        if score_variant_value == ScoreVariants.HardMediumSoftScore.value:
+        if score_variant_value == ScoreVariants.HardMediumSoftScore:
             return IndividualHardMediumSoft
         
         raise Exception("score_variant unrecognized")
