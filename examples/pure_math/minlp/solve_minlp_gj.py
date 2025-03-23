@@ -17,28 +17,28 @@ from greyjack.agents.base.ParallelizationBackend import ParallelizationBackend
 from greyjack.agents.base.LoggingLevel import LoggingLevel
 from greyjack.agents.termination_strategies import *
 
-from examples.pure_math.minlp.gj_files.ann_compressor import *
+from examples.pure_math.minlp.gj_files.rsyn0840m import *
 
 if __name__ == "__main__":
 
     math_model = build_math_model()
 
     #termination_strategy = StepsLimit(step_count_limit=1000)
-    #termination_strategy = TimeSpentLimit(time_seconds_limit=10)
+    #termination_strategy = TimeSpentLimit(time_seconds_limit=60)
     termination_strategy = ScoreNoImprovement(time_seconds_limit=15)
     #termination_strategy = ScoreLimit(score_to_compare=[0, 0])
-    """agent = TabuSearch(neighbours_count=1000, tabu_entity_rate=0.2, 
+    """agent = TabuSearch(neighbours_count=1000, tabu_entity_rate=0.8, 
                        mutation_rate_multiplier=1.0, move_probas=[0.5, 0.5, 0.0, 0.0, 0.0, 0.0], 
-                       migration_frequency=10, compare_to_global_frequency=1, termination_strategy=termination_strategy)"""
-    """agent = GeneticAlgorithm(population_size=512, crossover_probability=0.8, p_best_rate=0.2,
-                             tabu_entity_rate=0.0, mutation_rate_multiplier=1.0, move_probas=[0.5, 0.5, 0.0, 0.0, 0.0, 0.0],
-                             migration_rate=0.00001, migration_frequency=10, termination_strategy=termination_strategy)"""
-    agent = LateAcceptance(late_acceptance_size=200, tabu_entity_rate=0.0, 
+                       compare_to_global_frequency=10, termination_strategy=termination_strategy)"""
+    agent = GeneticAlgorithm(population_size=256, crossover_probability=0.8, p_best_rate=0.5,
+                             tabu_entity_rate=0.8, mutation_rate_multiplier=1.0, move_probas=[0.5, 0.5, 0.0, 0.0, 0.0, 0.0],
+                             migration_rate=0.00001, migration_frequency=10, termination_strategy=termination_strategy)
+    """agent = LateAcceptance(late_acceptance_size=200, tabu_entity_rate=0.8, 
                            mutation_rate_multiplier=1.0, move_probas=[0.5, 0.5, 0.0, 0.0, 0.0, 0.0], 
-                           compare_to_global_frequency=1000, termination_strategy=termination_strategy)
-    """agent = SimulatedAnnealing(initial_temperature=[1.0, 1.0], cooling_rate=0.9999, tabu_entity_rate=0.2, 
-                               mutation_rate_multiplier=None, move_probas=[0.5, 0.5, 0.0, 0.0, 0.0, 0.0], 
-                               compare_to_global_frequency=10000, termination_strategy=termination_strategy)"""
+                           compare_to_global_frequency=10000, termination_strategy=termination_strategy)"""
+    """agent = SimulatedAnnealing(initial_temperature=[1.0, 1.0], cooling_rate=0.9999, tabu_entity_rate=0.8, 
+                               mutation_rate_multiplier=1.0, move_probas=[0.5, 0.5, 0.0, 0.0, 0.0, 0.0], 
+                               compare_to_global_frequency=1000, termination_strategy=termination_strategy)"""
     
     solver = SolverPureMath(math_model, agent,
                             ParallelizationBackend.Multiprocessing, LoggingLevel.FreshOnly,

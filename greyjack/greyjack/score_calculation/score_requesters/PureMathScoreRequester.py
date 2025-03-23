@@ -9,6 +9,7 @@ from greyjack.pure_math.variables.BinaryVar import BinaryVar
 from greyjack.variables.GJFloat import GJFloat
 from greyjack.variables.GJInteger import GJInteger
 from greyjack.variables.GJBinary import GJBinary
+import numpy as np
 
 class PureMathScoreRequester():
 
@@ -44,7 +45,11 @@ class PureMathScoreRequester():
             variables_list.append( current_variable )
         self.variables_manager = VariablesManagerPy(variables_list)
         self.n_variables = len(variables_list)
-        self.discrte_ids = self.variables_manager.discrete_ids
+        self.discrete_ids = self.variables_manager.discrete_ids
+        self.discrete_var_names = set()
+        if self.discrete_ids is not None:
+            for discrete_id in self.discrete_ids:
+                self.discrete_var_names.add(self.arr_id_to_var_name_map[discrete_id])
 
     def request_score_plain(self, samples):
 
@@ -52,9 +57,9 @@ class PureMathScoreRequester():
 
         for sample in samples:
 
-            if self.discrte_ids is not None:
-                for i in self.discrte_ids:
-                    sample[i] = int(sample[i])
+            if self.discrete_ids is not None:
+                for i in self.discrete_ids:
+                    sample[i] = int(np.rint(sample[i]))
 
             for i in range(self.n_variables):
                 self.math_model.variables[self.arr_id_to_var_name_map[i]] = sample[i]
@@ -68,4 +73,47 @@ class PureMathScoreRequester():
         return score_batch
     
     def request_score_incremental(self, sample, deltas):
-        raise Exception("request_score_incremental() not implemented for PureMathScoreRequester")
+
+        score_batch = []
+
+        if self.discrete_ids is not None:
+            for i in self.discrete_ids:
+                sample[i] = int(np.rint(sample[i]))
+        for i in range(self.n_variables):
+            self.math_model.variables[self.arr_id_to_var_name_map[i]] = sample[i]
+        
+        if self.math_model.variable_to_constraint_index is None:
+            self.math_model.variable_to_contstraint_index = self.math_model._build_variable_to_constraint_index(self.variables_manager, self.var_name_to_arr_id_map, self.discrete_var_names)
+
+        hard_score_values_before = self.math_model.get_individual_hard_scores(absolute=True)
+        sum_hard_score_before = sum(hard_score_values_before.values())
+        #soft_score_value_before = self.math_model.get_sum_soft_score(is_fitting=True)
+
+        score_batch = []
+        for sample_deltas in deltas:
+            var_names = []
+            values_before = []
+            touched_constraints = []
+            for (i, new_value) in sample_deltas:
+                var_name = self.arr_id_to_var_name_map[i]
+                var_names.append(var_name)
+                values_before.append( self.math_model.variables[var_name] )
+                self.math_model.variables[var_name] = new_value
+                touched_constraints.append(self.math_model.variable_to_contstraint_index[var_name])
+            touched_constraints = set.union(*touched_constraints)
+            
+            sample_hard_score = sum_hard_score_before
+            for constraint_name in touched_constraints:
+                sample_hard_score -= hard_score_values_before[constraint_name]
+                sample_hard_score += abs(self.math_model.constraints[constraint_name].get_hard_score(self.math_model.variables, self.math_model.utility))
+            sample_soft_score = self.math_model.get_sum_soft_score(is_fitting=True)
+
+            score_batch.append(HardSoftScore(sample_hard_score, sample_soft_score))
+
+            for i in range(len(var_names)):
+                self.math_model.variables[var_names[i]] = values_before[i]
+        
+        return score_batch
+            
+
+

@@ -14,7 +14,7 @@ class LateAcceptance(Agent):
         mutation_rate_multiplier=None,
         move_probas=None,
         migration_frequency=999_999_999_999, # probably, better use only comparing with global. Need more researching.
-        compare_to_global_frequency=10, # too often comparing significally decreases common performance for fast-stepping metaheuristics
+        compare_to_global_frequency=1000, # too often comparing significally decreases common performance for fast-stepping metaheuristics
         termination_strategy=None,
     ):
         
@@ -36,7 +36,7 @@ class LateAcceptance(Agent):
         elif isinstance(self.cotwin, MathModel):
             self.score_requester = PureMathScoreRequester(self.cotwin)
             score_variant = self.cotwin.score_variant
-            self.cotwin.score_calculator.is_incremental = False #TODO: change to True when I implement incremental score calculation for MathModel
+            self.cotwin.score_calculator.is_incremental = False # if True, currently works badder. Will try improve later
         else:
             raise Exception("Cotwin must be either subclass of CotwinBase, either be instance of MathModel")
         semantic_groups_dict = self.score_requester.variables_manager.semantic_groups_map.copy()

@@ -109,7 +109,7 @@ impl VariablesManagerPy {
         let group_ids = self.semantic_groups_map.get(group_name).unwrap();
         return (group_ids, group_name);
     }
-
+    
     pub fn get_column_random_value(&self, column_id: usize) -> f64{
         Uniform::new(self.lower_bounds[column_id], self.upper_bounds[column_id]).sample(&mut StdRng::from_entropy())
     }

@@ -13,7 +13,7 @@ class TabuSearch(Agent):
         tabu_entity_rate,
         mutation_rate_multiplier=None,
         move_probas=None,
-        migration_frequency=None,
+        migration_frequency=999_999_999,
         compare_to_global_frequency=1, # Tabu is usually not too fast-stepping due to high neighbours_count
         termination_strategy=None,
     ):
@@ -39,7 +39,7 @@ class TabuSearch(Agent):
         elif isinstance(self.cotwin, MathModel):
             self.score_requester = PureMathScoreRequester(self.cotwin)
             score_variant = self.cotwin.score_variant
-            self.cotwin.score_calculator.is_incremental = False #TODO: change to True when I implement incremental score calculation for MathModel
+            self.cotwin.score_calculator.is_incremental = False # if True, currently works badder. Will try improve later
         else:
             raise Exception("Cotwin must be either subclass of CotwinBase, either be instance of MathModel")
 

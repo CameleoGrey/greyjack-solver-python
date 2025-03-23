@@ -33,9 +33,9 @@ if __name__ == "__main__":
     #file_path = Path(data_dir_path, data_dir_path, "belgium", "basic", "air", "belgium-n1000-k40.vrp") #optimum: ~57.7; first_fit: ~195.3; RoutingModel: from 67.3 to 74 (depends on time)
     # multi-depot with timewindows
     #file_path = Path(data_dir_path, "belgium", "multidepot-timewindowed", "air", "belgium-tw-d2-n50-k10.vrp") # optimum: ~15.98; first_fit: ~27.89
-    #file_path = Path(data_dir_path, "belgium", "multidepot-timewindowed", "air", "belgium-tw-d5-n500-k20.vrp") # optimum: ~43.3; first_fit: ~124.884
+    file_path = Path(data_dir_path, "belgium", "multidepot-timewindowed", "air", "belgium-tw-d5-n500-k20.vrp") # optimum: ~43.3; first_fit: ~124.884
     #file_path = Path(data_dir_path, "belgium", "multidepot-timewindowed", "air", "belgium-tw-d8-n1000-k40.vrp") # optimum: ~58.1; first_fit: ~154.565
-    file_path = Path(data_dir_path, "belgium", "multidepot-timewindowed", "air", "belgium-tw-d10-n2750-k55.vrp") # optimum: ~111; first_fit: ~380.9
+    #file_path = Path(data_dir_path, "belgium", "multidepot-timewindowed", "air", "belgium-tw-d10-n2750-k55.vrp") # optimum: ~111; first_fit: ~380.9
 
     domain_builder = DomainBuilder(file_path)
     cotwin_builder = CotwinBuilder(use_incremental_score_calculator=True, use_greed_init=True)
@@ -58,7 +58,7 @@ if __name__ == "__main__":
                                migration_frequency=10, termination_strategy=termination_strategy)"""
 
     solver = SolverOOP(domain_builder, cotwin_builder, agent, 
-                    ParallelizationBackend.Multiprocessing, LoggingLevel.Info,
+                    ParallelizationBackend.Multiprocessing, LoggingLevel.FreshOnly,
                     n_jobs=10, score_precision=[0, 0, 0])
     solution = solver.solve()
 

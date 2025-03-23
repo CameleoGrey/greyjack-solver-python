@@ -6,7 +6,7 @@ class GJSolution():
 
         if discrete_ids is not None:
             for discrete_id in discrete_ids:
-                variable_values[discrete_id] = int(variable_values[discrete_id])
+                variable_values[discrete_id] = int(np.rint(variable_values[discrete_id]))
         
         if score_precision is not None:
             for i in range(len(score_list)):
