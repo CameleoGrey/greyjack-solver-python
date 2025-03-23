@@ -2,6 +2,9 @@
 from greyjack.agents.base.Agent import Agent
 from greyjack.agents.metaheuristic_bases.SimulatedAnnealingBase import SimulatedAnnealingBase
 from greyjack.score_calculation.score_requesters.OOPScoreRequester import OOPScoreRequester
+from greyjack.score_calculation.score_requesters.PureMathScoreRequester import PureMathScoreRequester
+from greyjack.cotwin.CotwinBase import CotwinBase
+from greyjack.pure_math.MathModel import MathModel
 
 
 class SimulatedAnnealing(Agent):
@@ -12,7 +15,7 @@ class SimulatedAnnealing(Agent):
         tabu_entity_rate,
         mutation_rate_multiplier=None,
         move_probas=None,
-        migration_frequency=None,
+        migration_frequency=999_999_999,
         compare_to_global_frequency=10, # too often comparing significally decreases common performance for fast-stepping metaheuristics
         termination_strategy=None,
     ):  
@@ -31,9 +34,19 @@ class SimulatedAnnealing(Agent):
         self.is_win_from_comparing_with_global = True
 
     def _build_metaheuristic_base(self):
-        self.score_requester = OOPScoreRequester(self.cotwin)
+        
+        # when I use issubclass() solver dies silently, so check specific attributes
+        if hasattr(self.cotwin, "planning_entities"):
+            self.score_requester = OOPScoreRequester(self.cotwin)
+            score_variant = self.cotwin.score_calculator.score_variant
+        elif isinstance(self.cotwin, MathModel):
+            self.score_requester = PureMathScoreRequester(self.cotwin)
+            score_variant = self.cotwin.score_variant
+            self.cotwin.score_calculator.is_incremental = False #TODO: change to True when I implement incremental score calculation for MathModel
+        else:
+            raise Exception("Cotwin must be either subclass of CotwinBase, either be instance of MathModel")
         semantic_groups_dict = self.score_requester.variables_manager.semantic_groups_map.copy()
-        discrete_ids = self.score_requester.variables_manager.discrete_ids.copy()
+        discrete_ids = self.score_requester.variables_manager.discrete_ids
 
         """
         new(score_variant, variables_manager_py, 
@@ -44,7 +57,7 @@ class SimulatedAnnealing(Agent):
         """
 
         self.metaheuristic_base = SimulatedAnnealingBase.new(
-            self.cotwin.score_calculator.score_variant,
+            score_variant,
             self.score_requester.variables_manager,
             self.initial_temperature,
             self.tabu_entity_rate,

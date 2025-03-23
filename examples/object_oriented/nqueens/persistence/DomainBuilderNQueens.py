@@ -36,7 +36,11 @@ class DomainBuilderNQueens(DomainBuilderBase):
         return chess_field
     
     def build_from_solution(self, solution, initial_domain=None):
-        raise Exception("build_from_solution() not implemented for DomainBuilderNQueens")
+        domain = self.build_domain_from_scratch()
+        for i, row_id in enumerate( solution.variable_values_dict.values() ):
+            domain.queens[i].row.row_id = row_id
+        return domain
+
     
     def build_from_domain(self, domain):
         return super().build_from_domain(domain)

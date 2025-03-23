@@ -23,7 +23,7 @@ class IncrementalScoreCalculatorTSP(IncrementalScoreCalculator):
         # with huge performance boost on large datasets
 
         # from experiments: common performance up to ~2 times lower (depends on dataset size)
-        # than in fully Rust version of Solver. Need to keep in mind the opportunity of
+        # than in fully Rust version of SolverOOP. Need to keep in mind the opportunity of
         # rewriting constraints on Rust in Python version for production (if it's neccessary). 
         
         path_stops_df = planning_entity_dfs["path_stops"]

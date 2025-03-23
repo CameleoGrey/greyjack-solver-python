@@ -49,7 +49,7 @@ impl VariablesManagerPy {
 
     #[new]
     #[pyo3(signature = (variables_vec_py))]
-    pub fn new(variables_vec_py: Vec<GJPlanningVariablePy>) -> Self {
+    pub fn new(variables_vec_py: Vec<GJPlanningVariablePy>) -> PyResult<Self> {
 
         let variables_vec: Vec<GJPlanningVariable> = variables_vec_py.iter().map(|var_py| {
             GJPlanningVariable::new(
@@ -88,7 +88,7 @@ impl VariablesManagerPy {
             discrete_ids_option = None;
         }
 
-        Self {
+        Ok(Self {
             variables_vec: variables_vec,
             variables_count: variables_count,
             variable_ids: variable_ids,
@@ -99,7 +99,7 @@ impl VariablesManagerPy {
             semantic_group_keys: semantic_group_keys,
             n_semantic_groups: n_semantic_groups,
             discrete_ids: discrete_ids_option
-        }
+        })
 
     }
 

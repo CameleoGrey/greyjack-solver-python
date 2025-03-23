@@ -1,3 +1,3 @@
 
 
-from greyjack.Solver import Solver
+from greyjack.SolverOOP import SolverOOP

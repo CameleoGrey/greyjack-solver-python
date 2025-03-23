@@ -2,6 +2,9 @@
 from greyjack.agents.base.Agent import Agent
 from greyjack.agents.metaheuristic_bases.GeneticAlgorithmBase import GeneticAlgorithmBase
 from greyjack.score_calculation.score_requesters.OOPScoreRequester import OOPScoreRequester
+from greyjack.score_calculation.score_requesters.PureMathScoreRequester import PureMathScoreRequester
+from greyjack.cotwin.CotwinBase import CotwinBase
+from greyjack.pure_math.MathModel import MathModel
 
 class GeneticAlgorithm(Agent):
     def __init__(
@@ -23,12 +26,23 @@ class GeneticAlgorithm(Agent):
         self.is_win_from_comparing_with_global = False
 
     def _build_metaheuristic_base(self):
-        self.score_requester = OOPScoreRequester(self.cotwin)
+        
+        # when I use issubclass() solver dies silently, so check specific attributes
+        if hasattr(self.cotwin, "planning_entities"):
+            self.score_requester = OOPScoreRequester(self.cotwin)
+            score_variant = self.cotwin.score_calculator.score_variant
+        elif isinstance(self.cotwin, MathModel):
+            self.score_requester = PureMathScoreRequester(self.cotwin)
+            score_variant = self.cotwin.score_variant
+            self.cotwin.score_calculator.is_incremental = False
+        else:
+            raise Exception("Cotwin must be either subclass of CotwinBase, either be instance of MathModel")
+
         semantic_groups_dict = self.score_requester.variables_manager.semantic_groups_map.copy()
-        discrete_ids = self.score_requester.variables_manager.discrete_ids.copy()
+        discrete_ids = self.score_requester.variables_manager.discrete_ids
 
         self.metaheuristic_base = GeneticAlgorithmBase.new(
-            self.cotwin.score_calculator.score_variant,
+            score_variant,
             self.score_requester.variables_manager,
             self.population_size, 
             self.crossover_probability, 

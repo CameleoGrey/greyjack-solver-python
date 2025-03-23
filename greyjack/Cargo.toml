@@ -1,6 +1,6 @@
 [package]
 name = "greyjack"
-version = "0.1.4"
+version = "0.2.0"
 edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -23,7 +23,7 @@ polars = { version = "0.46.0", features = ["lazy", "ndarray", "serde", "abs"] }
 # uncomment to gain max performance (increases calculation speed about ~10%, 
 # but also increases build time ~20x times)
 [profile.release]
-lto = true
-codegen-units = 1
+#lto = true
+#codegen-units = 1
 debug = true
 opt-level = 3

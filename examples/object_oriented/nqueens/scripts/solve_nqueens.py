@@ -12,7 +12,7 @@ from examples.object_oriented.nqueens.persistence.DomainBuilderNQueens import Do
 from examples.object_oriented.nqueens.persistence.CotwinBuilderNQueens import CotwinBuilderNQueens
 from greyjack.agents.termination_strategies import *
 from greyjack.agents import *
-from greyjack.Solver import Solver
+from greyjack.SolverOOP import SolverOOP
 from greyjack.agents.base.LoggingLevel import LoggingLevel
 from greyjack.agents.base.ParallelizationBackend import ParallelizationBackend
 from greyjack.agents import *
@@ -20,7 +20,7 @@ from greyjack.agents import *
 if __name__ == "__main__":
 
     # build domain model
-    domain_builder = DomainBuilderNQueens(1024, random_seed=45)
+    domain_builder = DomainBuilderNQueens(16, random_seed=45)
     cotwin_builder = CotwinBuilderNQueens(use_incremental_score_calculator=True)
 
     #termination_strategy = StepsLimit(step_count_limit=1000)
@@ -40,11 +40,14 @@ if __name__ == "__main__":
                                mutation_rate_multiplier=None, move_probas=[0, 1, 0, 0, 0, 0], 
                                migration_frequency=10, compare_to_global_frequency=10, termination_strategy=termination_strategy)"""
 
-    solver = Solver(domain_builder, cotwin_builder, agent, 
+    solver = SolverOOP(domain_builder, cotwin_builder, agent, 
                     ParallelizationBackend.Multiprocessing, LoggingLevel.FreshOnly,
                     n_jobs=10, score_precision=[0])
     solution = solver.solve()
     #print( "Cotwin solution looks that: " )
     #print( solution )
+
+    domain = domain_builder.build_from_solution(solution)
+    print(domain)
 
     print( "done" )

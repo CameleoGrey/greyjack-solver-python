@@ -20,7 +20,7 @@ import gc
 
 current_platform = sys.platform
 
-class Solver():
+class SolverOOP():
 
     def __init__(self, domain_builder, cotwin_builder, agent,
                  parallelization_backend=ParallelizationBackend.Multiprocessing, 

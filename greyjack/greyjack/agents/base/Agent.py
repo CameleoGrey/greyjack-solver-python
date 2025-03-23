@@ -12,6 +12,7 @@ from greyjack.agents.termination_strategies import *
 from greyjack.agents.base.individuals.Individual import Individual
 from greyjack.agents.base.LoggingLevel import LoggingLevel
 from greyjack.agents.base.GJSolution import GJSolution
+from greyjack.pure_math.MathModel import MathModel
 
 current_platform = sys.platform
 
@@ -105,6 +106,11 @@ class Agent():
         self.agent_to_agent_socket_receiver.bind( self.agent_address_for_other_agents )
 
     def _build_cotwin(self):
+
+        if isinstance(self.domain_builder, MathModel):
+            self.cotwin = self.domain_builder
+            return
+
         if self.initial_solution is None:
             is_already_initialized = False
             domain = self.domain_builder.build_domain_from_scratch()
@@ -118,7 +124,10 @@ class Agent():
         self.cotwin = self.cotwin_builder.build_cotwin(domain, is_already_initialized)
     
     def _define_individual_type(self):
-        self.score_variant = self.cotwin.score_calculator.score_variant
+        if isinstance(self.cotwin, MathModel):
+            self.score_variant = self.cotwin.score_variant
+        else:
+            self.score_variant = self.cotwin.score_calculator.score_variant
         self.individual_type = Individual.get_related_individual_type(self.score_variant)
     
     # implements by concrete metaheuristics

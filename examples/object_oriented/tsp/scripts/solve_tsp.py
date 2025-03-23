@@ -14,7 +14,7 @@ from examples.object_oriented.tsp.persistence import CotwinBuilder
 from greyjack.agents.termination_strategies import *
 from greyjack.agents.base.LoggingLevel import LoggingLevel
 from greyjack.agents.base.ParallelizationBackend import ParallelizationBackend
-from greyjack import Solver
+from greyjack import SolverOOP
 from greyjack.agents import *
 
 if __name__ == "__main__":
@@ -53,7 +53,7 @@ if __name__ == "__main__":
                                mutation_rate_multiplier=None, move_probas=[0, 0.2, 0.2, 0.2, 0.2, 0.2], 
                                migration_frequency=10, termination_strategy=termination_strategy)"""
 
-    solver = Solver(domain_builder, cotwin_builder, agent, 
+    solver = SolverOOP(domain_builder, cotwin_builder, agent, 
                     ParallelizationBackend.Multiprocessing, LoggingLevel.Info,
                     n_jobs=10, score_precision=[0, 0])
     solution = solver.solve()
