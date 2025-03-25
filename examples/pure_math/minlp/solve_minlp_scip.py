@@ -214,7 +214,7 @@ project_dir_path = Path(*script_dir_path.parts[:project_dir_id+1])
 sys.path.append(str(project_dir_path))
 
 from pyomo.environ import *
-from examples.pure_math.minlp.minlp_files.rsyn0840m import *
+from examples.pure_math.minlp.minlp_files.sssd import *
 
 solver = SolverFactory('scip', executable="D:\\Soft\\SCIPOptSuite 9.1.0\\bin\\scip.exe")
 solution = solver.solve(model)

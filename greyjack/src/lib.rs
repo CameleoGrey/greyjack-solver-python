@@ -38,10 +38,20 @@ build_concrete_simulated_annealing_base!(SimulatedAnnealingSimple, IndividualSim
 build_concrete_simulated_annealing_base!(SimulatedAnnealingHardSoft, IndividualHardSoft, HardSoftScore);
 build_concrete_simulated_annealing_base!(SimulatedAnnealingHardMediumSoft, IndividualHardMediumSoft, HardMediumSoftScore);
 
+use std::fmt::Debug;
+use rand_distr::Normal;
+use rand::Rng;
+use rand::seq::SliceRandom;
+use std::f64::consts::PI;
+use rand::prelude::IteratorRandom;
+
+build_concrete_lshade_base!(LSHADESimple, IndividualSimple, SimpleScore);
+build_concrete_lshade_base!(LSHADEHardSoft, IndividualHardSoft, HardSoftScore);
+build_concrete_lshade_base!(LSHADEHardMediumSoft, IndividualHardMediumSoft, HardMediumSoftScore);
+
 build_concrete_sum_scores_function!(sum_simple_scores, SimpleScore);
 build_concrete_sum_scores_function!(sum_hard_soft_scores, HardSoftScore);
 build_concrete_sum_scores_function!(sum_hard_medium_soft_scores, HardMediumSoftScore);
-
 
 
 #[pymodule]
@@ -77,6 +87,9 @@ fn greyjack(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<SimulatedAnnealingSimple>()?;
     m.add_class::<SimulatedAnnealingHardSoft>()?;
     m.add_class::<SimulatedAnnealingHardMediumSoft>()?;
+    m.add_class::<LSHADESimple>()?;
+    m.add_class::<LSHADEHardSoft>()?;
+    m.add_class::<LSHADEHardMediumSoft>()?;
 
     let _ = m.add_function(wrap_pyfunction!(sum_simple_scores, m)?);
     let _ = m.add_function(wrap_pyfunction!(sum_hard_soft_scores, m)?);

@@ -101,18 +101,6 @@ impl GJPlanningVariable {
                 if self.frozen {
                     return initial_value;
                 }
-                
-                // needful for LSHADE in case of initialized variables for the whole population
-                // (it needs to choose vectors from history archive / population, that are different by at least one component).
-                // LSHADE will be added in later versions for tasks, containing many floats
-                match self.normal_distribution {
-                   Some(gauss) => {
-                    initial_value = Normal::new(initial_value, 0.1).unwrap().sample(&mut self.random_generator);
-                    initial_value = self.fix(initial_value);
-                   },
-                   None => ()
-                }
-
                 return initial_value;
             }
         }

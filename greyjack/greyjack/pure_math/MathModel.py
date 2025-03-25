@@ -35,6 +35,10 @@ class MathModel():
 
     def get_sum_hard_score(self, absolute):
 
+        #print()
+        #pprint(self.variables)
+        #print()
+
         try:
             individual_hard_scores = self.get_individual_hard_scores(absolute)
             sum_hard_score = 0.0

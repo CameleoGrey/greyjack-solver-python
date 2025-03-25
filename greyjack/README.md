@@ -44,9 +44,6 @@ maturin develop --release
 -  maturin will build the Rust part, get all Python dependencies (for solver itself, not examples) and install greyjack to your venv
 
 # RoadMap
-
-- API for modelling pure math problems (classic solvers like)
-- Modern variations (modifications) of LSHADE (Differential evolution algorithms often appear in articles as sota approaches)
 - CMA, probably its modern variants, adaptations for tasks with integer and categorical variables (often appears in articles as sota approach)
 - Add more examples: Job-Shop, Pickup&Delivery, some continuous and MIP tasks, scheduling, etc
 - Composite termination criterion (for example: solving limit minutes N AND score not improving M seconds)
