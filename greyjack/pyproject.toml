@@ -7,7 +7,7 @@ features = ["pyo3/extension-module"]
 
 [project]
 name = "greyjack"
-version = "0.2.3"
+version = "0.2.4"
 requires-python = ">=3.9"
 dependencies = [
 	"dill",

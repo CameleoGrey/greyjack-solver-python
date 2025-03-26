@@ -32,15 +32,9 @@ class SolverOOP():
         """
         On Linux platform solver needs 2 ports to bind.
         On other platforms n_agents + 2.
-        All ports are binding to localhost. 
-
-        TODO:
-        Create and run 2 Docker containers, that will bind same internal (localhost) ports.
-        Will them work simultaneously or someone (both) fall down?
-        In theory, containers have theyr own network spaces.
-        If Docker can bind the same ports of localhost in different containers
-        for internal interprocess communication, then I don't need to care
-        about internally binded ports count (only about exposed on the level of API facade).
+        All ports are binding to localhost.
+        If run multiple Dockers containers, multiple containers can bind the same ports of localhost (if built with default settings).
+        Look examples to verify it yourself (for example, nquuens Dockerfile, guide to build is inside file).
         """
         
         self.domain_builder = domain_builder
