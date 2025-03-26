@@ -16,7 +16,8 @@ from greyjack.utils.MINLP2GJTranslator import MINLP2GJTranslator
 data_dir_path = Path("examples", "pure_math", "minlp")
 original_file_dir = Path( data_dir_path, "minlp_files" )
 translated_file_dir = Path( data_dir_path, "gj_files" )
-file_name = "finbb.py"
+
+file_name = "camshape800.py"
 
 original_file_path = Path( original_file_dir, file_name )
 translated_file_path = Path( translated_file_dir, file_name )

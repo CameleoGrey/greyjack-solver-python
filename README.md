@@ -44,14 +44,14 @@ maturin develop --release
 -  maturin will build the Rust part, get all Python dependencies (for solver itself, not examples) and install greyjack to your venv
 
 # RoadMap
-- CMA, probably its modern variants, adaptations for tasks with integer and categorical variables (often appears in articles as sota approach)
 - Add more examples: Job-Shop, Pickup&Delivery, some continuous and MIP tasks, scheduling, etc
+- Types, arguments validation
+- Write docs
+- Tests, tests, tests...
 - Composite termination criterion (for example: solving limit minutes N AND score not improving M seconds)
 - Multi-level score
 - Custom moves support
 - Try to impove incremental (pseudo-incremental) score calculation mechanism (caching, no clonning, etc)
-- Write docs
 - Website
 - Useful text materials, guides, presentations
-- Tests, tests, tests...
-- Score explainer / interpreter
+- Score explainer / interpreter for OOP API
