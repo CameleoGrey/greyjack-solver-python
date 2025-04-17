@@ -42,7 +42,7 @@ if __name__ == "__main__":
     """agent = GeneticAlgorithm(population_size=128, crossover_probability=0.5, p_best_rate=0.2,
                              tabu_entity_rate=0.2, mutation_rate_multiplier=1.0, move_probas=[0.5, 0.5, 0.0, 0.0, 0.0, 0.0],
                              migration_rate=0.00001, migration_frequency=10, termination_strategy=termination_strategy)"""
-    """agent = LateAcceptance(late_acceptance_size=5, tabu_entity_rate=0.8, 
+    """agent = LateAcceptance(late_acceptance_size=10, tabu_entity_rate=0.8, 
                            mutation_rate_multiplier=None, compare_to_global_frequency=10, move_probas=[0.5, 0.5, 0.0, 0.0, 0.0, 0.0], 
                            termination_strategy=termination_strategy)"""
     """agent = SimulatedAnnealing(initial_temperature=[1.0, 1.0], cooling_rate=0.9999, tabu_entity_rate=0.8, 

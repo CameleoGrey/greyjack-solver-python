@@ -2,6 +2,7 @@
 /.vscode
 /greyjack/target
 /data
+/examples/object_oriented/project_job_shop
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

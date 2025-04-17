@@ -43,11 +43,12 @@ class CotwinBuilder(CotwinBuilderBase):
 
         cot_processes = []
         n_computers = len(domain_model.computers)
+        m_processes = len(domain_model.processes)
 
         if self.use_greed_init:
             initial_computer_ids = self._build_greed_initial_computer_ids(domain_model)
         else:
-            initial_computer_ids = n_computers * [None]
+            initial_computer_ids = m_processes * [None]
 
 
         for i, process in enumerate(domain_model.processes):

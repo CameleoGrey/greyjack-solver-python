@@ -7,6 +7,7 @@ import pickle
 import time
 import zmq
 import sys
+import traceback
 
 from greyjack.agents.termination_strategies import *
 from greyjack.agents.base.individuals.Individual import Individual
@@ -152,7 +153,8 @@ class Agent():
             self.steps_to_send_updates = self.migration_frequency
             self.termination_strategy.update( self )
         except Exception as e:
-            self.logger.error(f"{e}")
+            #self.logger.error(f"{e}")
+            self.logger.error(f"{traceback.format_exc()}")
             exit(-1)
 
         step_id = 0
@@ -166,7 +168,8 @@ class Agent():
                     else: 
                         self._step_plain()
             except Exception as e:
-                self.logger.error(f"{e}")
+                #self.logger.error(f"{e}")
+                self.logger.error(f"{traceback.format_exc()}")
                 exit(-1)
             
             try:
@@ -203,7 +206,8 @@ class Agent():
                             return
                     self.steps_to_compare_with_global = self.compare_to_global_frequency
             except Exception as e:
-                self.logger.error(f"{e}")
+                #self.logger.error(f"{e}")
+                self.logger.error(f"{traceback.format_exc()}")
                 exit(-1)
     
     def _init_population(self):

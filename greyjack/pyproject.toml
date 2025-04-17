@@ -7,7 +7,7 @@ features = ["pyo3/extension-module"]
 
 [project]
 name = "greyjack"
-version = "0.2.4"
+version = "0.2.5"
 requires-python = ">=3.9"
 dependencies = [
 	"dill",
@@ -27,11 +27,12 @@ authors = [
 maintainers = [
   {name = "Egor Chnegov (CameleoGrey)", email = "cameleogrey@yandex.ru"},
 ]
-description = "GreyJack Solver is a metaheuristic constraint solver for Python (current version) built on top of Polars. It empowers you to solve a wide range of constraint optimization problems, including continuous, integer, and mixed-integer challenges."
+description = "GreyJack Solver is a constraint metaheuristic solver for Python, built on the robust foundations of Rust and Polars. It empowers you to tackle a wide array of constraint optimization problems, including continuous, integer, and mixed-integer challenges with ease and efficiency."
 readme = "README.md"
 license = { file = "LICENSE" }
 keywords = ["greyjack", "solver", "optimization", "polars", "metaheuristic", "genetic algorithm"]
 classifiers = [
+	'Development Status :: 5 - Production/Stable',
 	'Intended Audience :: Science/Research',
     'Intended Audience :: Developers',
 	"License :: OSI Approved :: MIT License",
@@ -47,8 +48,10 @@ classifiers = [
     'Programming Language :: Python :: Implementation :: CPython',
     'Topic :: Software Development',
     'Topic :: Scientific/Engineering',
+	"Operating System :: OS Independent",
     'Operating System :: Microsoft :: Windows',
     'Operating System :: Unix',
+	'Operating System :: MacOS',
 ]
 
 [project.urls]
