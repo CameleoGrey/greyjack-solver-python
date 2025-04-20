@@ -19,4 +19,7 @@ class PlainScoreCalculator(PlainScoreCalculator):
     
     def some_constraint_function(self, planning_entity_dfs, problem_fact_dfs):
 
+        print(planning_entity_dfs["jobs"])
+        raise Exception("Plain scoring is not already implemented for this task")
+
         return scores

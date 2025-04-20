@@ -31,7 +31,10 @@ class SimulatedAnnealing(Agent):
 
         # If true - stucks more often in local minimums, but converges much faster
         # may be useful in multiple stages solving
-        self.is_win_from_comparing_with_global = True
+        if compare_to_global_frequency <= 0:
+            self.is_win_from_comparing_with_global = False
+        else:
+            self.is_win_from_comparing_with_global = True
 
     def _build_metaheuristic_base(self):
         

@@ -25,7 +25,10 @@ class LateAcceptance(Agent):
         self.tabu_entity_rate = tabu_entity_rate
         self.mutation_rate_multiplier = mutation_rate_multiplier
         self.move_probas = move_probas
-        self.is_win_from_comparing_with_global = True # Much faster convergence without stucking in local optimums (with high migration frequency)
+        if compare_to_global_frequency <= 0:
+            self.is_win_from_comparing_with_global = False
+        else:
+            self.is_win_from_comparing_with_global = True # Much faster convergence without stucking in local optimums (with high migration frequency)
 
     def _build_metaheuristic_base(self):
         

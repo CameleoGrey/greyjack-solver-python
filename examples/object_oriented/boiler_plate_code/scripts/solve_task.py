@@ -19,14 +19,13 @@ from greyjack.agents import *
 
 if __name__ == "__main__":
 
-    # build domain model
     domain_builder = DomainBuilder(random_seed=45)
-    cotwin_builder = CotwinBuilder(use_incremental_score_calculator=True)
+    cotwin_builder = CotwinBuilder(use_incremental_score_calculator=False, use_greed_init=False)
 
     #termination_strategy = StepsLimit(step_count_limit=1000)
-    #termination_strategy = TimeSpentLimit(time_seconds_limit=60)
+    termination_strategy = TimeSpentLimit(time_seconds_limit=60)
     #termination_strategy = ScoreNoImprovement(time_seconds_limit=15)
-    termination_strategy = ScoreLimit(score_to_compare=[0])
+    #termination_strategy = ScoreLimit(score_to_compare=[0, 0])
     agent = TabuSearch(neighbours_count=20, tabu_entity_rate=0.0, 
                        mutation_rate_multiplier=None, move_probas=[0.5, 0.5, 0, 0, 0, 0], 
                        migration_frequency=10, termination_strategy=termination_strategy)
@@ -42,7 +41,7 @@ if __name__ == "__main__":
 
     solver = SolverOOP(domain_builder, cotwin_builder, agent, 
                     ParallelizationBackend.Multiprocessing, LoggingLevel.FreshOnly,
-                    n_jobs=10, score_precision=[0])
+                    n_jobs=10, score_precision=[0, 0])
     solution = solver.solve()
     
     domain = domain_builder.build_from_solution(solution)

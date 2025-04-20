@@ -29,7 +29,18 @@ class CotwinBuilder(CotwinBuilderBase):
         cotwin.set_score_calculator( score_calculator )
 
         return cotwin
+    
+    def _build_some_planning_entities(self, domain, is_already_initialized):
+        return some_planning_entities
+    
+    def _build_some_problem_facts(self, domain):
+        return some_problem_facts
 
+    def _remove_redundant_fields(self, entities_list, redundant_fields):
+
+        for i in range(len(entities_list)):
+            for field_name in redundant_fields:
+                delattr(entities_list[i], field_name)
 
 
 

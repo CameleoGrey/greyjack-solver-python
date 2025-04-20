@@ -44,7 +44,6 @@ maturin develop --release
 -  maturin will build the Rust part, get all Python dependencies (for solver itself, not examples) and install greyjack to your venv
 
 # RoadMap
-- Add more examples: Job-Shop, Pickup&Delivery, some continuous and MIP tasks, scheduling, etc
 - Types, arguments validation
 - Write docs
 - Tests, tests, tests...

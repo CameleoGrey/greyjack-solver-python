@@ -121,14 +121,10 @@ class CotwinBuilder(CotwinBuilderBase):
     def _build_planning_shifts(self, domain, is_already_initialized):
 
         if is_already_initialized:
-            raise Exception("Using initialized domain not initialized")
+            raise Exception("Use of existing domain object is not already implemented for this task")
         
         if self.use_greed_init:
-            raise Exception("greed initialization isn't implemented")
-        else:
-            n_employees = len(domain.employees)
-            initial_employee_ids = [random.randint(0, n_employees-1) for i in range(len(domain.shifts))]
-            #random.shuffle(initial_employee_ids)
+            raise Exception("greed init is not already implemented for this task")
 
         planning_shifts = []
         for i, current_shift in enumerate(domain.shifts):
@@ -139,7 +135,7 @@ class CotwinBuilder(CotwinBuilderBase):
                     end = current_shift.end,
                     location = current_shift.location,
                     required_skill = current_shift.required_skill,
-                    employee = GJInteger(0, len(domain.employees)-1, False, initial_employee_ids[i]),
+                    employee = GJInteger(0, len(domain.employees)-1, False, None),
                 )
             )
         
