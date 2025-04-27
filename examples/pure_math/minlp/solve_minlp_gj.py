@@ -17,7 +17,7 @@ from greyjack.agents.base.ParallelizationBackend import ParallelizationBackend
 from greyjack.agents.base.LoggingLevel import LoggingLevel
 from greyjack.agents.termination_strategies import *
 
-from examples.pure_math.minlp.gj_files.camshape800 import *
+from examples.pure_math.minlp.gj_files.sssd import *
 
 if __name__ == "__main__":
 
