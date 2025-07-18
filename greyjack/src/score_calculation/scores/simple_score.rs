@@ -24,6 +24,11 @@ impl SimpleScore {
         }
     }
 
+    #[staticmethod]
+    pub fn get_score_fields() -> Vec<String> {
+        vec!["simple_value".to_string()]
+    }
+
     #[getter]
     pub fn get_simple_value(&self) -> f64 {
         self.simple_value

@@ -229,6 +229,19 @@ class Agent():
             scores = self.score_requester.request_score_incremental(generated_sample, deltas)
             self.population.append(self.individual_type(generated_sample, scores[0]))
 
+            #if self.score_requester.is_greynet:
+            
+                ##################
+                # TODO: understand, why produces incorrect results
+                #self.score_requester.cotwin.score_calculator.commit_deltas(deltas[0])
+                
+                #self.score_requester.cotwin.score_calculator._apply_deltas_internal(deltas[0])
+                #self.score_requester.cotwin.score_calculator.update_entity_mapping_incremental(deltas[0])
+                #new_score = self.score_requester.cotwin.score_calculator.get_score()
+                #self.population[0] = self.individual_type(self.population[0].variable_values, new_score)
+                ##################
+
+
     def _step_plain(self):
         new_population = []
         samples = self.metaheuristic_base.sample_candidates_plain(self.population, self.agent_top_individual)
@@ -240,6 +253,9 @@ class Agent():
         candidates = [self.individual_type(samples[i].copy(), scores[i]) for i in range(len(samples))]
         new_population = self.metaheuristic_base.build_updated_population(self.population, candidates)
 
+        #if self.score_requester.is_greynet:
+        #    self.score_requester.cotwin.score_calculator.update_entity_mapping_plain(new_population[0].variable_values)
+
         self.population = new_population
 
     def _step_incremental(self):
@@ -250,7 +266,33 @@ class Agent():
             for score in scores:
                 score.round(self.score_precision)
 
-        new_population = self.metaheuristic_base.build_updated_population_incremental(self.population, sample, deltas, scores)
+        new_population, new_values = self.metaheuristic_base.build_updated_population_incremental(self.population, sample, deltas, scores)
+        if self.score_requester.is_greynet and new_values is not None:
+            
+            ##################
+            # TODO: understand, why produces incorrect results
+            #self.score_requester.cotwin.score_calculator.commit_deltas(new_values)
+            
+            #self.score_requester.cotwin.score_calculator._apply_deltas_internal(new_values)
+            #self.score_requester.cotwin.score_calculator.update_entity_mapping_incremental(new_values)
+            #new_score = self.score_requester.cotwin.score_calculator.get_score()
+            #new_population[0] = self.individual_type(new_population[0].variable_values, new_score)
+            ##################
+
+            ##################
+            # gives correct results, but lacks of performance due to linear updates for each acceptable solution
+            self.score_requester.cotwin.score_calculator._apply_deltas_internal(list(enumerate(new_population[0].variable_values)))
+            new_score = self.score_requester.cotwin.score_calculator.get_score()
+            new_population[0] = self.individual_type(new_population[0].variable_values, new_score)
+            ##################
+
+            #new_score = self.score_requester.cotwin.score_calculator._full_sync_and_get_score(new_population[0].variable_values)
+            #new_population[0] = self.individual_type(new_population[0].variable_values, new_score)
+
+            #self.score_requester.cotwin.score_calculator._apply_deltas_internal(new_values)
+            #new_score = self.score_requester.cotwin.score_calculator.get_score()
+            #new_population[0] = self.individual_type(new_population[0].variable_values, new_score)
+
         self.population = new_population
 
     def _send_receive_updates(self):
@@ -456,6 +498,11 @@ class Agent():
             self.population[:n_migrants] = updated_tail
         else:
             raise Exception("metaheuristic_kind can be only Population or LocalSearch")
+        
+        #if self.score_requester.is_greynet:
+        #    self.score_requester.cotwin.score_calculator._full_sync_and_get_score(new_population[0].variable_values)
+        #if self.score_requester.is_greynet:
+        #   self.score_requester.cotwin.score_calculator.update_entity_mapping_plain(self.population[0].variable_values)
 
         self.round_robin_status_dict = updates_reply["round_robin_status_dict"]
         self.round_robin_status_dict[self.agent_id] = self.agent_status
@@ -496,6 +543,10 @@ class Agent():
             if global_top_individual < self.agent_top_individual:
                 self.agent_top_individual = global_top_individual
                 self.population[0] = global_top_individual.copy()
+                #if self.score_requester.is_greynet:
+                #    self.score_requester.cotwin.score_calculator._full_sync_and_get_score(new_population[0].variable_values)
+                #if self.score_requester.is_greynet:
+                #    self.score_requester.cotwin.score_calculator.update_entity_mapping_plain(self.population[0].variable_values)
         
         is_variable_names_received = master_publication[1]
         self.is_master_received_variables_info = is_variable_names_received
