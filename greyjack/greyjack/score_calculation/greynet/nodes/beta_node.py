@@ -7,6 +7,23 @@ from ..common.index.advanced_index import AdvancedIndex
 from ..core.tuple import TupleState, AbstractTuple
 from ..common.joiner_type import JoinerType
 
+# --- Start of Bug Fix ---
+# Defines the logical inverse for each joiner type, which is essential for
+# creating symmetrical join logic within the BetaNode.
+JOINER_INVERSES = {
+    JoinerType.EQUAL: JoinerType.EQUAL,
+    JoinerType.NOT_EQUAL: JoinerType.NOT_EQUAL,
+    JoinerType.LESS_THAN: JoinerType.GREATER_THAN,
+    JoinerType.LESS_THAN_OR_EQUAL: JoinerType.GREATER_THAN_OR_EQUAL,
+    JoinerType.GREATER_THAN: JoinerType.LESS_THAN,
+    JoinerType.GREATER_THAN_OR_EQUAL: JoinerType.LESS_THAN_OR_EQUAL,
+    JoinerType.RANGE_OVERLAPS: JoinerType.RANGE_OVERLAPS,
+    JoinerType.RANGE_CONTAINS: JoinerType.RANGE_WITHIN,
+    JoinerType.RANGE_WITHIN: JoinerType.RANGE_CONTAINS,
+}
+# --- End of Bug Fix ---
+
+
 class BetaNode(AbstractNode, ABC):
     """
     An abstract base class for all join nodes (Bi, Tri, Quad, etc.).
@@ -17,8 +34,22 @@ class BetaNode(AbstractNode, ABC):
         self.scheduler = scheduler
         self.tuple_pool = tuple_pool
         self.joiner_type = joiner_type
+        
+        # --- Start of Bug Fix ---
+        # The join is defined from left to right (e.g., left.key < right.key).
+        # When a new right_tuple arrives, we probe the left_index to find left_tuples
+        # that satisfy the original joiner (e.g., left.key < new_right.key).
         self.left_index = self._create_index(left_index_properties, joiner_type)
-        self.right_index = self._create_index(right_index_properties, joiner_type)
+
+        # When a new left_tuple arrives, we must probe the right_index using the
+        # inverse joiner to find right_tuples that satisfy the condition.
+        # e.g., to find 'right' where 'new_left.key < right.key', we must query for
+        # 'right.key > new_left.key'.
+        inverse_joiner = JOINER_INVERSES.get(joiner_type)
+        if inverse_joiner is None:
+            raise ValueError(f"Joiner type {joiner_type} has no defined inverse.")
+        self.right_index = self._create_index(right_index_properties, inverse_joiner)
+        # --- End of Bug Fix ---
         
         self.beta_memory = {}
 
@@ -84,4 +115,3 @@ class BetaNode(AbstractNode, ABC):
 
     def retract(self, tuple_):
         raise NotImplementedError("BetaNode requires directional retract via an adapter.")
-

@@ -26,7 +26,6 @@ class CotwinBuilderNQueens(CotwinBuilderBase):
             column_id = i
             planning_row_id = GJInteger(0, n-1, False, queens[i].row.row_id, None)
             cot_queen = CotQueen( queen_id, planning_row_id, column_id )
-            cot_queen.greynet_fact_id = queen_id
             cot_queens.append( cot_queen )
 
         nqueens_cotwin = NQueensCotwin()
@@ -35,7 +34,10 @@ class CotwinBuilderNQueens(CotwinBuilderBase):
             nqueens_cotwin.set_score_calculator( PlainScoreCalculatorNQueens() )
         elif self.scorer_name == "pseudo":
             nqueens_cotwin.set_score_calculator( IncrementalScoreCalculatorNQueens() )
-        elif self.scorer_name == "greynet":
+        elif self.scorer_name == "greynet_plain":
+            greynet_score_calculator_nqueens.is_incremental = False
+            nqueens_cotwin.set_score_calculator( greynet_score_calculator_nqueens )
+        elif self.scorer_name == "greynet_incremental":
             nqueens_cotwin.set_score_calculator( greynet_score_calculator_nqueens )
         else:
             raise ValueError("Available score calculators: plain, pseudo, greynet")

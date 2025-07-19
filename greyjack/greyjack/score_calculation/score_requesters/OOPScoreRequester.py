@@ -36,15 +36,12 @@ class OOPScoreRequester:
             # Build the crucial mapping from solver's variable index to the domain object
             var_idx_to_entity_map = {}
             i = 0
-            greynet_fact_id = 0
             for group_name in self.cotwin.planning_entities:
                 for native_entity, initialized_entity in zip(self.cotwin.planning_entities[group_name], initialized_planning_entities[group_name]):
                     for attr_name, attr_value in native_entity.__dict__.items():
                         if type(attr_value) in {GJFloat, GJInteger, GJBinary}:
                             var_idx_to_entity_map[i] = (initialized_entity, attr_name)
                             i += 1
-                    initialized_entity.greynet_fact_id = greynet_fact_id
-                    greynet_fact_id += 1
             calculator.var_idx_to_entity_map = var_idx_to_entity_map
         except:
             print(traceback.format_exc())

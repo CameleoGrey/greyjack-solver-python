@@ -229,18 +229,6 @@ class Agent():
             scores = self.score_requester.request_score_incremental(generated_sample, deltas)
             self.population.append(self.individual_type(generated_sample, scores[0]))
 
-            #if self.score_requester.is_greynet:
-            
-                ##################
-                # TODO: understand, why produces incorrect results
-                #self.score_requester.cotwin.score_calculator.commit_deltas(deltas[0])
-                
-                #self.score_requester.cotwin.score_calculator._apply_deltas_internal(deltas[0])
-                #self.score_requester.cotwin.score_calculator.update_entity_mapping_incremental(deltas[0])
-                #new_score = self.score_requester.cotwin.score_calculator.get_score()
-                #self.population[0] = self.individual_type(self.population[0].variable_values, new_score)
-                ##################
-
 
     def _step_plain(self):
         new_population = []
@@ -270,8 +258,7 @@ class Agent():
         if self.score_requester.is_greynet and new_values is not None:
             
             ##################
-            # TODO: understand, why produces incorrect results
-            #self.score_requester.cotwin.score_calculator.commit_deltas(new_values)
+            self.score_requester.cotwin.score_calculator.commit_deltas(new_values)
             
             #self.score_requester.cotwin.score_calculator._apply_deltas_internal(new_values)
             #self.score_requester.cotwin.score_calculator.update_entity_mapping_incremental(new_values)
@@ -281,9 +268,9 @@ class Agent():
 
             ##################
             # gives correct results, but lacks of performance due to linear updates for each acceptable solution
-            self.score_requester.cotwin.score_calculator._apply_deltas_internal(list(enumerate(new_population[0].variable_values)))
-            new_score = self.score_requester.cotwin.score_calculator.get_score()
-            new_population[0] = self.individual_type(new_population[0].variable_values, new_score)
+            #self.score_requester.cotwin.score_calculator._apply_deltas_internal(list(enumerate(new_population[0].variable_values)))
+            #new_score = self.score_requester.cotwin.score_calculator.get_score()
+            #new_population[0] = self.individual_type(new_population[0].variable_values, new_score)
             ##################
 
             #new_score = self.score_requester.cotwin.score_calculator._full_sync_and_get_score(new_population[0].variable_values)

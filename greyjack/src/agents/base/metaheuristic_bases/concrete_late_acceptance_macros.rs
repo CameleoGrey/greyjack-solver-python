@@ -149,7 +149,7 @@ macro_rules! build_concrete_late_acceptance_base {
                     sample: Vec<f64>,
                     deltas: Vec<Vec<(usize, f64)>>,
                     scores: Vec<$score_type>,
-                ) -> Vec<$individual_variant> {
+                ) -> (Vec<$individual_variant>, Option<Vec<(usize, f64)>>) {
 
                 let late_native_score;
                 if self.late_scores.len() == 0 {
@@ -161,23 +161,21 @@ macro_rules! build_concrete_late_acceptance_base {
                 let candidate_score = scores[0].clone();
                 
                 let mut sample = sample;
-                let new_population:Vec<$individual_variant>;
                 if (candidate_score <= late_native_score) || (candidate_score <= current_population[0].score) {
-                    let best_deltas = &deltas[0];
-                    for (var_id, new_value) in best_deltas {
+                    let best_deltas = deltas[0].clone();
+                    for (var_id, new_value) in &best_deltas {
                         sample[*var_id] = *new_value;
                     }
                     let best_candidate = $individual_variant::new(sample.clone(), candidate_score.clone());
-                    new_population = vec![best_candidate; 1];
+                    let new_population = vec![best_candidate; 1];
                     self.late_scores.push_front(candidate_score);
                     if self.late_scores.len() > self.late_acceptance_size {
                         self.late_scores.pop_back();
                     }
+                    (new_population, Some(best_deltas))
                 } else {
-                    new_population = current_population.clone();
+                    (current_population.clone(), None)
                 }
-
-                return new_population;
             }
             
             #[getter]

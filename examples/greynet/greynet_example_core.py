@@ -122,7 +122,7 @@ def max_consecutive_days():
             )
             .join(
                  builder.for_each(CompanyPolicy),
-                 JoinerType.GREATER_THAN, # A dummy join to bring the policy into the stream
+                 JoinerType.GREATER_THAN,
                  left_key_func=lambda name, sequences: 1,
                  right_key_func=lambda policy: 0
             )
