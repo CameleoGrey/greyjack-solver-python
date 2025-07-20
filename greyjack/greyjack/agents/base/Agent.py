@@ -229,6 +229,7 @@ class Agent():
             scores = self.score_requester.request_score_incremental(generated_sample, deltas)
             self.population.append(self.individual_type(generated_sample, scores[0]))
 
+
     def _step_plain(self):
         new_population = []
         samples = self.metaheuristic_base.sample_candidates_plain(self.population, self.agent_top_individual)
@@ -239,7 +240,6 @@ class Agent():
 
         candidates = [self.individual_type(samples[i].copy(), scores[i]) for i in range(len(samples))]
         new_population = self.metaheuristic_base.build_updated_population(self.population, candidates)
-
         self.population = new_population
 
     def _step_incremental(self):
@@ -250,7 +250,10 @@ class Agent():
             for score in scores:
                 score.round(self.score_precision)
 
-        new_population = self.metaheuristic_base.build_updated_population_incremental(self.population, sample, deltas, scores)
+        new_population, new_values = self.metaheuristic_base.build_updated_population_incremental(self.population, sample, deltas, scores)
+        if self.score_requester.is_greynet and new_values is not None:
+            self.score_requester.cotwin.score_calculator.commit_deltas(new_values)
+
         self.population = new_population
 
     def _send_receive_updates(self):
@@ -285,7 +288,6 @@ class Agent():
                     break
                 else:
                     continue
-
         
         # population already sorted after step
         #self.population.sort()
@@ -301,13 +303,6 @@ class Agent():
                    "round_robin_status_dict": self.round_robin_status_dict,
                    "request_type": "put_updates", 
                    "migrants": migrants}
-        """if self.metaheuristic_base.metaheuristic_name == "LSHADE":
-            if len(self.history_archive) > 0:
-                rand_id = random.randint(0, len(self.history_archive) - 1)
-                request["history_archive"] = self.history_archive[rand_id].as_list()
-                #request["history_archive"] = self.history_archive[-1]
-            else:
-                request["history_archive"] = None"""
 
         request_serialized = pickle.dumps(request)
         try:
@@ -341,15 +336,6 @@ class Agent():
             return
         self.agent_to_agent_socket_receiver.send(pickle.dumps("Successfully received updates"))
         updates_reply = pickle.loads( updates_reply )
-
-        """if self.metaheuristic_base.metaheuristic_name == "LSHADE":
-            history_migrant = updates_reply["history_archive"]
-            if (history_migrant is not None and len(self.history_archive) > 0):
-                history_migrant = self.individual_type.from_list(history_migrant)
-                rand_id = random.randint(0, len(self.history_archive) - 1)
-                #if updates_reply["history_archive"] < self.history_archive[-1]:
-                if history_migrant < self.history_archive[rand_id]:
-                    self.history_archive[rand_id] = history_migrant"""
 
         migrants = updates_reply["migrants"]
         migrants = self.individual_type.convert_lists_to_individuals(migrants)
@@ -402,13 +388,6 @@ class Agent():
                    "round_robin_status_dict": self.round_robin_status_dict,
                    "request_type": "put_updates", 
                    "migrants": migrants}
-        """if self.metaheuristic_base.metaheuristic_name == "LSHADE":
-            if len(self.history_archive) > 0:
-                rand_id = random.randint(0, len(self.history_archive) - 1)
-                request["history_archive"] = self.history_archive[rand_id].as_list()
-                #request["history_archive"] = self.history_archive[-1]
-            else:
-                request["history_archive"] = None"""
 
         try:
             self.agent_to_agent_pipe_sender.send( request )
@@ -429,15 +408,6 @@ class Agent():
             self.agent_to_agent_pipe_receiver.send("Failed to receive updates")
             return
         self.agent_to_agent_pipe_receiver.send("Successfully received updates")
-
-        """if self.metaheuristic_base.metaheuristic_name == "LSHADE":
-            history_migrant = updates_reply["history_archive"]
-            if (history_migrant is not None and len(self.history_archive) > 0):
-                history_migrant = self.individual_type.from_list(history_migrant)
-                rand_id = random.randint(0, len(self.history_archive) - 1)
-                #if updates_reply["history_archive"] < self.history_archive[-1]:
-                if history_migrant < self.history_archive[rand_id]:
-                    self.history_archive[rand_id] = history_migrant"""
 
         migrants = updates_reply["migrants"]
         migrants = self.individual_type.convert_lists_to_individuals(migrants)
@@ -483,8 +453,6 @@ class Agent():
 
     def _check_global_updates(self):
         self._check_global_updates_universal()
-    
-
 
     def _check_global_updates_universal(self):
         master_publication = self.agent_to_master_subscriber_socket.recv()

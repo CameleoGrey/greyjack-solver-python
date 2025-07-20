@@ -138,30 +138,30 @@ macro_rules! build_concrete_tabu_search_base {
                     sample: Vec<f64>,
                     deltas: Vec<Vec<(usize, f64)>>,
                     scores: Vec<$score_type>,
-                ) -> Vec<$individual_variant> {
+                ) -> (Vec<$individual_variant>, Option<Vec<(usize, f64)>>) {
                 
-
                 let best_score_id: usize = scores
                     .iter()
                     .enumerate()
                     .min_by(|(_, a), (_, b)| a.cmp(b))
                     .map(|(index, _)| index)
                     .unwrap();
+                
                 let mut sample = sample;
                 let best_score = scores[best_score_id].clone();    
-                let new_population:Vec<$individual_variant>;
+                
                 if best_score <= current_population[0].score {
-                    let best_deltas = &deltas[best_score_id];
-                    for (var_id, new_value) in best_deltas {
+                    let new_values = deltas[best_score_id].clone();
+                    for (var_id, new_value) in &new_values {
                         sample[*var_id] = *new_value;
                     }
                     let best_candidate = $individual_variant::new(sample.clone(), best_score);
-                    new_population = vec![best_candidate; 1];
-                } else {
-                    new_population = current_population.clone();
-                }
+                    let new_population = vec![best_candidate; 1];
 
-                return new_population;
+                    (new_population, Some(new_values))
+                } else {
+                    (current_population.clone(), None)
+                }
             }
 
             #[getter]

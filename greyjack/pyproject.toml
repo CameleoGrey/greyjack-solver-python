@@ -7,14 +7,18 @@ features = ["pyo3/extension-module"]
 
 [project]
 name = "greyjack"
-version = "0.2.6"
+version = "0.3.6"
 requires-python = ">=3.9"
 dependencies = [
+	"bitarray>=3.5.0",
 	"dill",
+	"maturin>=1.9.1",
+	"mmh3>=5.1.0",
 	"multiprocess",
 	"mypy",
 	"mypy-extensions",
 	"mypy-protobuf",
+	"numba>=0.60.0",
 	"numpy",
 	"pathos",
 	"polars",

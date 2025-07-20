@@ -28,6 +28,15 @@ impl HardMediumSoftScore {
         }
     }
 
+    #[staticmethod]
+    pub fn get_score_fields() -> Vec<String> {
+        vec![
+            "hard_score".to_string(),
+            "medium_score".to_string(),
+            "soft_score".to_string(),
+        ]
+    }
+
     #[getter]
     pub fn get_hard_score(&self) -> f64 {
         self.hard_score
