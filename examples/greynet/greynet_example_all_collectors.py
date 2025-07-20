@@ -164,61 +164,6 @@ def filtering_collector_example():
             .penalize_simple(lambda product_id, count: 0) # Reporting only
            )
 
-@cb.constraint("find_consecutive_shipments")
-def consecutive_sequences_collector_example():
-    """Demonstrates: consecutive_sequences
-    Finds consecutive sequences of shipment numbers for each order.
-    """
-    return (cb.for_each(Shipment)
-            .group_by(
-                lambda s: s.order_id,
-                Collectors.consecutive_sequences(lambda s: s.shipment_no)
-            )
-            .filter(lambda order_id, sequences: any(seq.length > 1 for seq in sequences))
-            .penalize_simple(lambda order_id, sequences: 0) # Reporting only
-           )
-
-@cb.constraint("find_overlapping_maintenance")
-def connected_ranges_collector_example():
-    """Demonstrates: connected_ranges
-    Finds groups of overlapping or adjacent maintenance windows for each machine.
-    """
-    return (cb.for_each(Maintenance)
-            .group_by(
-                lambda m: m.machine_id,
-                Collectors.connected_ranges(
-                    start_func=lambda m: m.start_time,
-                    end_func=lambda m: m.end_time
-                )
-            )
-            .filter(lambda machine_id, ranges: any(len(r.data) > 1 for r in ranges))
-            .penalize_simple(lambda machine_id, ranges: 0) # Reporting only
-            )
-
-@cb.constraint("tumbling_window_events")
-def tumbling_window_example():
-    """Demonstrates: TumblingWindowCollector for aggregation
-    Groups events into 10-second, non-overlapping ("tumbling") windows
-    and calculates the average transaction value for each window.
-    """
-    # Define a key function to map timestamps to a 10-second window start time
-    def get_window_key(timestamp: datetime) -> datetime:
-        epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
-        window_size_sec = 10
-        elapsed_sec = (timestamp - epoch).total_seconds()
-        window_index = int(elapsed_sec // window_size_sec)
-        window_start_ts = epoch.timestamp() + window_index * window_size_sec
-        return datetime.fromtimestamp(window_start_ts, tz=timezone.utc)
-
-    return (cb.for_each(UserEvent)
-            .group_by(
-                group_key_function=lambda e: get_window_key(e.timestamp),
-                collector_supplier=Collectors.avg(lambda e: e.value)
-            )
-            .filter(lambda window_start, avg_value: avg_value > 0)
-            .penalize_simple(lambda window_start, avg_value: 0) # Reporting only
-           )
-
 # 3. Main Execution Block
 # =======================
 

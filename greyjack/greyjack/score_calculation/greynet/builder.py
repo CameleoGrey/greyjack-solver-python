@@ -28,10 +28,6 @@ from .collectors.composite_collector import CompositeCollector
 from .collectors.mapping_collector import MappingCollector
 from .collectors.filtering_collector import FilteringCollector
 from .collectors.constraint_match_collector import ConstraintMatchCollector
-
-
-from .constraint_tools.consecutive_set_tree import ConsecutiveSetTree
-from .constraint_tools.connected_range_tracker import ConnectedRangeTracker
 from .constraint_tools.counting_bloom_filter import CountingBloomFilter
 
 
@@ -219,30 +215,6 @@ class Collectors:
             def is_empty(self):
                 return len(self.bf) == 0
         return BloomCollector
-
-    @staticmethod
-    def consecutive_sequences(sequence_func, increment_func=lambda p, i: p + i):
-        """
-        Creates a collector that groups items into consecutive sequences.
-        """
-        class Collector:
-            def __init__(self): self.tree = ConsecutiveSetTree(sequence_func, increment_func)
-            def insert(self, item): self.tree.add(item); return lambda: self.tree.remove(item)
-            def result(self): return self.tree.get_sequences()
-            def is_empty(self): return not self.tree.get_sequences()
-        return Collector
-
-    @staticmethod
-    def connected_ranges(start_func, end_func):
-        """
-        Creates a collector that groups items into connected (overlapping or adjacent) ranges.
-        """
-        class Collector:
-            def __init__(self): self.tracker = ConnectedRangeTracker(start_func, end_func)
-            def insert(self, item): self.tracker.add(item); return lambda: self.tracker.remove(item)
-            def result(self): return self.tracker.get_connected_ranges()
-            def is_empty(self): return not self.tracker.get_connected_ranges()
-        return Collector
 
 
 class Patterns:

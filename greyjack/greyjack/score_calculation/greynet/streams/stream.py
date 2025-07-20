@@ -7,10 +7,8 @@ from ..tuple_tools import get_facts
 from .stream_definition import (
     FilterDefinition, JoinDefinition,
     GroupByDefinition, ConditionalJoinDefinition, FlatMapDefinition,
-    SlidingWindowDefinition, SequencePatternDefinition
 )
 from ..core.tuple import UniTuple, BiTuple, AbstractTuple
-from ..collectors.temporal_collectors import EventSequencePattern
 
 if TYPE_CHECKING:
     from ..constraint_factory import ConstraintFactory
@@ -107,35 +105,6 @@ class Stream(Generic[T_Tuple]):
         """Builds the Rete node for this stream and wires its children."""
         node = self.definition.build_node(node_counter, node_map, scheduler, tuple_pool)
         return node
-        
-    # --- Temporal and Sequential Extensions ---
-
-    def sequence(self, time_extractor: Callable[[Any], datetime], *steps: Callable[[Any], bool],
-                 within: timedelta, allow_gaps: bool = True) -> Stream['UniTuple']:
-        """
-        Finds sequences of facts that match a series of predicates within a time window.
-        The stream emits a list of the facts that form a complete sequence.
-        """
-        if self.arity != 1:
-            raise TypeError("The .sequence() operation can only be applied to a stream of single facts (UniTuple).")
-        
-        # --- Start of Bug Fix ---
-        # `steps` is already a tuple. Using `list(steps)` made the pattern unhashable.
-        pattern = EventSequencePattern(pattern_steps=steps, within=within, allow_gaps=allow_gaps)
-        # --- End of Bug Fix ---
-        seq_def = SequencePatternDefinition(self.constraint_factory, self, pattern, time_extractor)
-        new_stream = Stream[UniTuple](self.constraint_factory, seq_def)
-        self._add_next_stream(new_stream)
-        return new_stream
-
-    def window(self, time_extractor: Callable[[Any], datetime]) -> 'WindowedStream':
-        """
-        Initiates a windowing operation on the stream. Must be followed by a window type
-        like .sliding() or .tumbling().
-        """
-        if self.arity != 1:
-            raise TypeError("Windowing operations can only be applied to a stream of single facts (UniTuple).")
-        return WindowedStream(self, time_extractor)
 
     # --- Penalty Methods ---
     def _create_penalty(self, score_type: str, penalty: Union[int, float, Callable]) -> Constraint:
@@ -159,35 +128,3 @@ class Stream(Generic[T_Tuple]):
 
     def penalize_simple(self, penalty: Union[int, float, Callable]) -> Constraint:
         return self._create_penalty("simple", penalty)
-
-
-class WindowedStream:
-    """A helper class to provide a fluent API for creating time windows."""
-    def __init__(self, source_stream: Stream, time_extractor: Callable[[Any], datetime]):
-        self._source_stream = source_stream
-        self._time_extractor = time_extractor
-
-    def sliding(self, size: timedelta, slide: timedelta) -> Stream['BiTuple']:
-        """
-        Groups facts into overlapping windows of a fixed size that advance at a specified interval.
-        Emits a stream of (window_start_time, [facts_in_window]) BiTuples.
-        """
-        if slide.total_seconds() <= 0 or size.total_seconds() <= 0:
-            raise ValueError("Window size and slide interval must be positive.")
-        if slide > size:
-            raise ValueError("Slide interval cannot be greater than the window size for a sliding window.")
-
-        window_def = SlidingWindowDefinition(
-            self._source_stream.constraint_factory, self._source_stream, 
-            self._time_extractor, size, slide
-        )
-        new_stream = Stream[BiTuple](self._source_stream.constraint_factory, window_def)
-        self._source_stream._add_next_stream(new_stream)
-        return new_stream
-
-    def tumbling(self, size: timedelta) -> Stream['BiTuple']:
-        """
-        Groups facts into non-overlapping windows of a fixed size.
-        This is a special case of a sliding window where the slide interval equals the size.
-        """
-        return self.sliding(size=size, slide=size)

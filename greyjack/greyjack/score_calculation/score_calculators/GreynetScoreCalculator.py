@@ -74,7 +74,6 @@ class GreynetScoreCalculator:
         Returns:
             A score object (e.g., HardSoftScore) representing the current state.
         """
-        #self.session.recalculate_all_scores()
         score = self.session.get_score()
         return score
         
@@ -106,33 +105,6 @@ class GreynetScoreCalculator:
 
         return scores
 
-    def map_deltas_to_entities(self, deltas: List[Tuple[int, float]]) -> List[Any]:
-
-        entity_objects: List[Any] = []
-
-        for var_idx, new_value in deltas:
-            entity, attr_name = self.var_idx_to_entity_map[var_idx]
-            mapped_entity = deepcopy(entity)            
-            setattr(mapped_entity, attr_name, new_value)
-            entity_objects.append(mapped_entity)
-
-        return entity_objects
-
-    def update_entity_mapping_plain(self, sample):
-        delta_updates = list(enumerate(sample))
-
-        for var_idx, new_value in delta_updates:
-            entity, attr_name = self.var_idx_to_entity_map[var_idx]
-            setattr(entity, attr_name, new_value)
-        
-        self._apply_deltas_internal(delta_updates)
-    
-    def update_entity_mapping_incremental(self, deltas):
-
-        for var_idx, new_value in deltas:
-            entity, attr_name = self.var_idx_to_entity_map[var_idx]
-            setattr(entity, attr_name, new_value)
-
 
     def _apply_deltas_internal(self, deltas: List[Tuple[int, float]]) -> Tuple[List[Any], List[Any]]:
         """
@@ -153,23 +125,10 @@ class GreynetScoreCalculator:
         originals = list(original_to_changed_map.keys())
         changed = list(original_to_changed_map.values())
 
-        #pprint(self.session.get_constraint_matches())
-
         if originals:
-            #print_internals_from_entity_mapping(self.var_idx_to_entity_map)
-            #print_internals(originals, "row_id")
-            #score_1 = self.get_score()
             self.session.retract_batch(originals)
-            #self.session.flush()
-            #score_2 = self.get_score()
-
-            #print_internals(changed, "row_id")
             self.session.insert_batch(changed)
             self.session.flush()
-            #score_3 = self.get_score()
-
-            #print()
-            #self.session.recalculate_all_scores()
 
         return originals, changed
 
@@ -179,19 +138,10 @@ class GreynetScoreCalculator:
         It retracts the modified copies and re-inserts the original facts.
         """
         if changed:
-            
-            #score_1 = self.get_score()
             self.session.retract_batch(changed)
-            #self.session.flush()
-            #score_2 = self.get_score()
-
             self.session.insert_batch(originals)
             self.session.flush()
-            #score_3 = self.get_score()
-
-            #print()
             pass
-            #self.session.recalculate_all_scores()
     
     def commit_deltas(self, deltas):
 
@@ -209,11 +159,6 @@ class GreynetScoreCalculator:
         originals = list(original_to_changed_map.keys())
         changed = list(original_to_changed_map.values())
 
-        #for i in range(len(originals)):
-        #    tmp = changed[i].greynet_fact_id
-        #    changed[i].greynet_fact_id = originals[i].greynet_fact_id
-        #    originals[i].greynet_fact_id = tmp
-
         if originals:
             self.session.retract_batch(originals)
             #self.session.flush()
@@ -225,27 +170,3 @@ class GreynetScoreCalculator:
             original_id = id(entity)
             if original_id in original_id_to_new_entity_map:
                 self.var_idx_to_entity_map[var_idx] = (original_id_to_new_entity_map[original_id], attr_name)
-        
-        #self.session.recalculate_all_scores()
-    
-# for debug
-@staticmethod
-def print_internals(entities, attr_name):
-
-    values = []
-    for entity in entities:
-        value = getattr(entity, attr_name)
-        values.append(value)
-    
-    print(values)
-
-@staticmethod
-def print_internals_from_entity_mapping(var_idx_to_entity_map):
-
-    values = []
-    for var_idx in var_idx_to_entity_map.keys():
-        entity, attr_name = var_idx_to_entity_map[var_idx]
-        value = getattr(entity, attr_name)
-        values.append(value)
-    
-    print(values)

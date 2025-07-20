@@ -29,9 +29,9 @@ There are 2 editions of GreyJack Solver:
 ```
 pip install greyjack
 ```
-
-- Explore examples. Docs and guides will be later. GreyJack is very intuitively understandable solver (even Rust version).
-- Simply solve your tasks simply.
+- Clone data for examples from this [repo](https://github.com/CameleoGrey/greyjack-data-for-examples)
+- Explore, try examples. Docs and guides will be later. GreyJack is very intuitively understandable solver (even Rust version).
+- Use examples as reference for solving your tasks.
 
 # Install GreyJack Solver from source
 
@@ -46,11 +46,11 @@ maturin develop --release
 # RoadMap
 - Types, arguments validation
 - Write docs
-- Tests, tests, tests...
+- Tests, tests, tests... + integration wtih CI/CD
 - Composite termination criterion (for example: solving limit minutes N AND score not improving M seconds)
 - Multi-level score
 - Custom moves support
-- Try to impove incremental (pseudo-incremental) score calculation mechanism (caching, no clonning, etc)
 - Website
 - Useful text materials, guides, presentations
 - Score explainer / interpreter for OOP API
+- Reimplement GreyNet in Rust

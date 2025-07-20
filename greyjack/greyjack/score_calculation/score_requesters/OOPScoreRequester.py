@@ -11,12 +11,11 @@ import traceback
 class OOPScoreRequester:
     def __init__(self, cotwin):
         self.cotwin = cotwin
-        self.is_greynet = isinstance(self.cotwin.score_calculator, GreynetScoreCalculator)
-        
-        # This initialization logic is common to both modes
         variables_vec, var_name_to_vec_id_map, vec_id_to_var_name_map = self.build_variables_info(self.cotwin)
         self.variables_manager = VariablesManagerPy(variables_vec)
         self.vec_id_to_var_name_map = vec_id_to_var_name_map
+
+        self.is_greynet = isinstance(self.cotwin.score_calculator, GreynetScoreCalculator)
 
         if self.is_greynet:
             self._init_greynet()
@@ -46,7 +45,6 @@ class OOPScoreRequester:
         except:
             print(traceback.format_exc())
         
-        # Perform the initial full load of the Greynet session
         calculator.initial_load(initialized_planning_entities, self.cotwin.problem_facts)
     
     def build_initialized_entities(self, planning_entities, group_name):
@@ -72,9 +70,6 @@ class OOPScoreRequester:
                 value = attribute_value.planning_variable.initial_value
                 if value is None:
                     raise ValueError("All planning variables must have initial value for scoring by greynet")
-                
-                #if type(attribute_value) in {GJInteger, GJBinary}:
-                #    value = int(value)
             else:
                 value = attribute_value
             
@@ -85,10 +80,6 @@ class OOPScoreRequester:
         new_entity.greynet_fact_id = entity.greynet_fact_id
 
         return new_entity
-    
-    def set_correct_greynet_state(self, chosen_deltas):
-        calculator = self.cotwin.score_calculator
-        calculator._apply_deltas_internal(chosen_deltas)
 
     def _init_plain(self, variables_vec, var_name_to_vec_id_map, vec_id_to_var_name_map):
         """Initializes the requester for the standard DataFrame-based calculation."""
@@ -110,25 +101,19 @@ class OOPScoreRequester:
         
     def request_score_plain(self, samples):
         if self.is_greynet:
-            # Delegate to the calculator's full sync method for each sample
             return [self.cotwin.score_calculator._full_sync_and_get_score(s) for s in samples]
         else:
-            # Use the existing Rust-based DataFrame builder
             planning_entity_dfs, problem_fact_dfs = self.candidate_dfs_builder.get_plain_candidate_dfs(samples)
             return self.cotwin.get_score_plain(planning_entity_dfs, problem_fact_dfs)
 
     def request_score_incremental(self, sample, deltas):
         if self.is_greynet:
-            # Delegate the entire batch of deltas to the calculator
             return self.cotwin.score_calculator._apply_and_get_score_for_batch(deltas)
         else:
-             # Use the existing Rust-based incremental logic
             planning_entity_dfs, problem_fact_dfs, delta_dfs_for_rust = self.candidate_dfs_builder.get_incremental_candidate_dfs(sample, deltas)
             return self.cotwin.get_score_incremental(planning_entity_dfs, problem_fact_dfs, delta_dfs_for_rust)
 
-    # The following methods are shared helpers and remain unchanged.
     def build_variables_info(self, cotwin):
-        # ... (implementation is identical to the one provided)
         variables_vec = []
         var_name_to_vec_id_map = {}
         vec_id_to_var_name_map = {}
@@ -150,7 +135,6 @@ class OOPScoreRequester:
         return variables_vec, var_name_to_vec_id_map, vec_id_to_var_name_map
 
     def build_column_map(self, entity_groups):
-        # ... (implementation is identical to the one provided)
         column_dict = {}
         entity_is_int_map = {}
         for group_name in entity_groups:
@@ -168,7 +152,6 @@ class OOPScoreRequester:
         return column_dict, entity_is_int_map
     
     def build_group_dfs(self, entity_groups, column_dict, is_planning):
-        # ... (implementation is identical to the one provided)
         df_dict = {}
         for df_name in column_dict:
             column_names = column_dict[df_name]

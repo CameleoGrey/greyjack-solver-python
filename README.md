@@ -46,11 +46,11 @@ maturin develop --release
 # RoadMap
 - Types, arguments validation
 - Write docs
-- Tests, tests, tests...
+- Tests, tests, tests... + integration wtih CI/CD
 - Composite termination criterion (for example: solving limit minutes N AND score not improving M seconds)
 - Multi-level score
 - Custom moves support
-- Try to impove incremental (pseudo-incremental) score calculation mechanism (caching, no clonning, etc)
 - Website
 - Useful text materials, guides, presentations
 - Score explainer / interpreter for OOP API
+- Reimplement GreyNet in Rust

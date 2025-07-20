@@ -102,34 +102,6 @@ def overlapping_shifts():
             .penalize_hard(1.0) # Use new penalty method
     )
 
-# --- Rule 5: Maximum Consecutive Work Days (Soft Priority) ---
-@builder.constraint("Exceeds max consecutive work days")
-def max_consecutive_days():
-    # This penalizes based on the number of days over the limit.
-    penalty_func = lambda name, sequences, policy: sum(
-        seq.length - policy.max_consecutive_work_days
-        for seq in sequences if seq.length > policy.max_consecutive_work_days
-    )
-
-    return (
-        builder.for_each(Shift)
-            .group_by(
-                lambda shift: shift.employee_name,
-                Collectors.consecutive_sequences(
-                    sequence_func=lambda shift: shift.shift_date,
-                    increment_func=lambda d, i: d + timedelta(days=i)
-                )
-            )
-            .join(
-                 builder.for_each(CompanyPolicy),
-                 JoinerType.GREATER_THAN,
-                 left_key_func=lambda name, sequences: 1,
-                 right_key_func=lambda policy: 0
-            )
-            .filter(lambda name, sequences, policy: any(seq.length > policy.max_consecutive_work_days for seq in sequences))
-            .penalize_soft(lambda name, sequences, policy: penalty_func(name, sequences, policy) * 50) # Dynamic penalty
-    )
-
 
 # --- 3. Execution and Verification (Updated for new score object) ---
 

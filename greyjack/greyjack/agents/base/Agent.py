@@ -240,10 +240,6 @@ class Agent():
 
         candidates = [self.individual_type(samples[i].copy(), scores[i]) for i in range(len(samples))]
         new_population = self.metaheuristic_base.build_updated_population(self.population, candidates)
-
-        #if self.score_requester.is_greynet:
-        #    self.score_requester.cotwin.score_calculator.update_entity_mapping_plain(new_population[0].variable_values)
-
         self.population = new_population
 
     def _step_incremental(self):
@@ -256,29 +252,7 @@ class Agent():
 
         new_population, new_values = self.metaheuristic_base.build_updated_population_incremental(self.population, sample, deltas, scores)
         if self.score_requester.is_greynet and new_values is not None:
-            
-            ##################
             self.score_requester.cotwin.score_calculator.commit_deltas(new_values)
-            
-            #self.score_requester.cotwin.score_calculator._apply_deltas_internal(new_values)
-            #self.score_requester.cotwin.score_calculator.update_entity_mapping_incremental(new_values)
-            #new_score = self.score_requester.cotwin.score_calculator.get_score()
-            #new_population[0] = self.individual_type(new_population[0].variable_values, new_score)
-            ##################
-
-            ##################
-            # gives correct results, but lacks of performance due to linear updates for each acceptable solution
-            #self.score_requester.cotwin.score_calculator._apply_deltas_internal(list(enumerate(new_population[0].variable_values)))
-            #new_score = self.score_requester.cotwin.score_calculator.get_score()
-            #new_population[0] = self.individual_type(new_population[0].variable_values, new_score)
-            ##################
-
-            #new_score = self.score_requester.cotwin.score_calculator._full_sync_and_get_score(new_population[0].variable_values)
-            #new_population[0] = self.individual_type(new_population[0].variable_values, new_score)
-
-            #self.score_requester.cotwin.score_calculator._apply_deltas_internal(new_values)
-            #new_score = self.score_requester.cotwin.score_calculator.get_score()
-            #new_population[0] = self.individual_type(new_population[0].variable_values, new_score)
 
         self.population = new_population
 
@@ -314,7 +288,6 @@ class Agent():
                     break
                 else:
                     continue
-
         
         # population already sorted after step
         #self.population.sort()
@@ -330,13 +303,6 @@ class Agent():
                    "round_robin_status_dict": self.round_robin_status_dict,
                    "request_type": "put_updates", 
                    "migrants": migrants}
-        """if self.metaheuristic_base.metaheuristic_name == "LSHADE":
-            if len(self.history_archive) > 0:
-                rand_id = random.randint(0, len(self.history_archive) - 1)
-                request["history_archive"] = self.history_archive[rand_id].as_list()
-                #request["history_archive"] = self.history_archive[-1]
-            else:
-                request["history_archive"] = None"""
 
         request_serialized = pickle.dumps(request)
         try:
@@ -370,15 +336,6 @@ class Agent():
             return
         self.agent_to_agent_socket_receiver.send(pickle.dumps("Successfully received updates"))
         updates_reply = pickle.loads( updates_reply )
-
-        """if self.metaheuristic_base.metaheuristic_name == "LSHADE":
-            history_migrant = updates_reply["history_archive"]
-            if (history_migrant is not None and len(self.history_archive) > 0):
-                history_migrant = self.individual_type.from_list(history_migrant)
-                rand_id = random.randint(0, len(self.history_archive) - 1)
-                #if updates_reply["history_archive"] < self.history_archive[-1]:
-                if history_migrant < self.history_archive[rand_id]:
-                    self.history_archive[rand_id] = history_migrant"""
 
         migrants = updates_reply["migrants"]
         migrants = self.individual_type.convert_lists_to_individuals(migrants)
@@ -431,13 +388,6 @@ class Agent():
                    "round_robin_status_dict": self.round_robin_status_dict,
                    "request_type": "put_updates", 
                    "migrants": migrants}
-        """if self.metaheuristic_base.metaheuristic_name == "LSHADE":
-            if len(self.history_archive) > 0:
-                rand_id = random.randint(0, len(self.history_archive) - 1)
-                request["history_archive"] = self.history_archive[rand_id].as_list()
-                #request["history_archive"] = self.history_archive[-1]
-            else:
-                request["history_archive"] = None"""
 
         try:
             self.agent_to_agent_pipe_sender.send( request )
@@ -459,15 +409,6 @@ class Agent():
             return
         self.agent_to_agent_pipe_receiver.send("Successfully received updates")
 
-        """if self.metaheuristic_base.metaheuristic_name == "LSHADE":
-            history_migrant = updates_reply["history_archive"]
-            if (history_migrant is not None and len(self.history_archive) > 0):
-                history_migrant = self.individual_type.from_list(history_migrant)
-                rand_id = random.randint(0, len(self.history_archive) - 1)
-                #if updates_reply["history_archive"] < self.history_archive[-1]:
-                if history_migrant < self.history_archive[rand_id]:
-                    self.history_archive[rand_id] = history_migrant"""
-
         migrants = updates_reply["migrants"]
         migrants = self.individual_type.convert_lists_to_individuals(migrants)
         n_migrants = len(migrants)
@@ -485,11 +426,6 @@ class Agent():
             self.population[:n_migrants] = updated_tail
         else:
             raise Exception("metaheuristic_kind can be only Population or LocalSearch")
-        
-        #if self.score_requester.is_greynet:
-        #    self.score_requester.cotwin.score_calculator._full_sync_and_get_score(new_population[0].variable_values)
-        #if self.score_requester.is_greynet:
-        #   self.score_requester.cotwin.score_calculator.update_entity_mapping_plain(self.population[0].variable_values)
 
         self.round_robin_status_dict = updates_reply["round_robin_status_dict"]
         self.round_robin_status_dict[self.agent_id] = self.agent_status
@@ -517,8 +453,6 @@ class Agent():
 
     def _check_global_updates(self):
         self._check_global_updates_universal()
-    
-
 
     def _check_global_updates_universal(self):
         master_publication = self.agent_to_master_subscriber_socket.recv()
@@ -530,10 +464,6 @@ class Agent():
             if global_top_individual < self.agent_top_individual:
                 self.agent_top_individual = global_top_individual
                 self.population[0] = global_top_individual.copy()
-                #if self.score_requester.is_greynet:
-                #    self.score_requester.cotwin.score_calculator._full_sync_and_get_score(new_population[0].variable_values)
-                #if self.score_requester.is_greynet:
-                #    self.score_requester.cotwin.score_calculator.update_entity_mapping_plain(self.population[0].variable_values)
         
         is_variable_names_received = master_publication[1]
         self.is_master_received_variables_info = is_variable_names_received

@@ -11,8 +11,6 @@ from ..nodes.group_node import GroupNode
 from ..nodes.from_uni_node import FromUniNode
 from ..nodes.flatmap_node import FlatMapNode
 from ..nodes.conditional_node import ConditionalNode
-from ..nodes.sliding_window_node import SlidingWindowNode
-from ..nodes.sequence_pattern_node import SequencePatternNode
 from .join_adapters import JoinLeftAdapter, JoinRightAdapter
 from ..function import Function
 
@@ -22,7 +20,6 @@ if TYPE_CHECKING:
     from ..core.tuple_pool import TuplePool
     from ..core.tuple import AbstractTuple
     from ..nodes.abstract_node import AbstractNode
-    from ..collectors.temporal_collectors import EventSequencePattern
 
 class StreamDefinition(ABC):
     """An abstract base class for defining the behavior of a stream node."""
@@ -225,57 +222,3 @@ class FlatMapDefinition(StreamDefinition):
         final_mapper_obj = FlatMapWrapper(self.mapper)
         
         return FlatMapNode(node_id, final_mapper_obj, scheduler, tuple_pool)
-
-class SlidingWindowDefinition(StreamDefinition):
-    """Definition for a sliding window operation."""
-    def __init__(self, factory: 'ConstraintFactory', source_stream: 'Stream',
-                 time_extractor: Callable[[Any], datetime], window_size: timedelta, slide_interval: timedelta):
-        super().__init__(factory, source_stream)
-        self.time_extractor = time_extractor
-        self.window_size = window_size
-        self.slide_interval = slide_interval
-        self.retrieval_id = ('sliding_window', source_stream.definition.retrieval_id, 
-                            time_extractor, window_size, slide_interval)
-
-    def get_target_arity(self) -> int: return 2
-
-    def build_node(self, node_counter, node_map, scheduler, tuple_pool: 'TuplePool') -> 'AbstractNode':
-        node = node_map.get(self.retrieval_id)
-        if node is None:
-            node = self._create_node(node_counter, scheduler, tuple_pool)
-            parent_node = self.source_stream.definition.build_node(node_counter, node_map, scheduler, tuple_pool)
-            parent_node.add_child_node(node)
-            node_map[self.retrieval_id] = node
-        return node
-        
-    def _create_node(self, node_counter, scheduler, tuple_pool) -> 'AbstractNode':
-        node_id = node_counter.value; node_counter.value += 1
-        return SlidingWindowNode(
-            node_id, self.time_extractor, self.window_size, self.slide_interval, scheduler, tuple_pool
-        )
-
-class SequencePatternDefinition(StreamDefinition):
-    """Definition for a sequence detection operation."""
-    def __init__(self, factory: 'ConstraintFactory', source_stream: 'Stream',
-                 pattern: 'EventSequencePattern', time_extractor: Callable[[Any], datetime]):
-        super().__init__(factory, source_stream)
-        self.pattern = pattern
-        self.time_extractor = time_extractor
-        self.retrieval_id = ('sequence', source_stream.definition.retrieval_id, pattern, time_extractor)
-
-    def get_target_arity(self) -> int: return 1
-
-    def build_node(self, node_counter, node_map, scheduler, tuple_pool: 'TuplePool') -> 'AbstractNode':
-        node = node_map.get(self.retrieval_id)
-        if node is None:
-            node = self._create_node(node_counter, scheduler, tuple_pool)
-            parent_node = self.source_stream.definition.build_node(node_counter, node_map, scheduler, tuple_pool)
-            parent_node.add_child_node(node)
-            node_map[self.retrieval_id] = node
-        return node
-
-    def _create_node(self, node_counter, scheduler, tuple_pool) -> 'AbstractNode':
-        node_id = node_counter.value; node_counter.value += 1
-        return SequencePatternNode(
-            node_id, self.pattern, self.time_extractor, scheduler, tuple_pool
-        )
