@@ -26,24 +26,22 @@ class OOPScoreRequester:
         """Initializes the requester and calculator for Greynet mode."""
         calculator = self.cotwin.score_calculator
 
-        try:
-            initialized_planning_entities = {}
-            for group_name in self.cotwin.planning_entities:
-                current_initialized_entities = self.build_initialized_entities(self.cotwin.planning_entities, group_name)
-                initialized_planning_entities[group_name] = current_initialized_entities
+        initialized_planning_entities = {}
+        for group_name in self.cotwin.planning_entities:
+            current_initialized_entities = self.build_initialized_entities(self.cotwin.planning_entities, group_name)
+            initialized_planning_entities[group_name] = current_initialized_entities
 
-            # Build the crucial mapping from solver's variable index to the domain object
-            var_idx_to_entity_map = {}
-            i = 0
-            for group_name in self.cotwin.planning_entities:
-                for native_entity, initialized_entity in zip(self.cotwin.planning_entities[group_name], initialized_planning_entities[group_name]):
-                    for attr_name, attr_value in native_entity.__dict__.items():
-                        if type(attr_value) in {GJFloat, GJInteger, GJBinary}:
-                            var_idx_to_entity_map[i] = (initialized_entity, attr_name)
-                            i += 1
-            calculator.var_idx_to_entity_map = var_idx_to_entity_map
-        except:
-            print(traceback.format_exc())
+        # Build the crucial mapping from solver's variable index to the domain object
+        var_idx_to_entity_map = {}
+        i = 0
+        for group_name in self.cotwin.planning_entities:
+            for native_entity, initialized_entity in zip(self.cotwin.planning_entities[group_name], initialized_planning_entities[group_name]):
+                for attr_name, attr_value in native_entity.__dict__.items():
+                    if type(attr_value) in {GJFloat, GJInteger, GJBinary}:
+                        var_idx_to_entity_map[i] = (initialized_entity, attr_name)
+                        i += 1
+        calculator.var_idx_to_entity_map = var_idx_to_entity_map
+
         
         calculator.initial_load(initialized_planning_entities, self.cotwin.problem_facts)
     

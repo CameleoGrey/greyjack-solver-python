@@ -1,22 +1,24 @@
+# greyjack/SolverOOP.py
 
 import pickle
 import time
 import random
 import uuid
+import logging
+import zmq
+import sys
+import gc
+import multiprocessing
+from multiprocessing import Pipe
+from copy import deepcopy
+
+from pathos.multiprocessing import ProcessPool
+from pathos.threading import ThreadPool
 
 from greyjack.agents.base.LoggingLevel import LoggingLevel
 from greyjack.agents.base.ParallelizationBackend import ParallelizationBackend
 from greyjack.agents.base.GJSolution import GJSolution
 from greyjack.agents.base.individuals.Individual import Individual
-from pathos.multiprocessing import ProcessPool
-from pathos.threading import ThreadPool
-import multiprocessing
-from multiprocessing import Pipe, SimpleQueue
-from copy import deepcopy
-import logging
-import zmq
-import sys
-import gc
 
 current_platform = sys.platform
 
@@ -56,6 +58,7 @@ class SolverOOP():
         self.is_agent_wins_from_comparing_with_global = agent.is_win_from_comparing_with_global
         self.agent_statuses = {}
         self.observers = []
+        self.is_running = False  # Control flag for the solving process
 
         self.is_linux = True if "linux" in current_platform else False
 
@@ -80,7 +83,6 @@ class SolverOOP():
         handler = logging.StreamHandler()
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
-
         pass
 
     def _init_master_pub_sub(self):
@@ -101,7 +103,6 @@ class SolverOOP():
         self.context = zmq.Context()
         self.master_to_agents_subscriber_socket = self.context.socket(zmq.SUB)
         self.master_to_agents_subscriber_socket.setsockopt_string(zmq.SUBSCRIBE, "")
-        # process only the most actual messages from agents (drop old messages)
         self.master_to_agents_subscriber_socket.setsockopt(zmq.CONFLATE, 1)
         self.master_to_agents_subscriber_socket.bind( self.master_subscriber_address )
 
@@ -111,7 +112,7 @@ class SolverOOP():
 
     def _init_agents_available_addresses_and_ports(self):
 
-        minimal_ports_count_required = self.n_jobs + 2 # including master ports
+        minimal_ports_count_required = self.n_jobs + 2
         if self.available_ports is not None:
             available_ports_count = len(self.available_ports)
             if available_ports_count < minimal_ports_count_required:
@@ -124,7 +125,6 @@ class SolverOOP():
         available_agent_to_agent_ports = [self.available_ports[current_port_id + i] for i in range(self.n_jobs)]
         self.available_agent_to_agent_ports = available_agent_to_agent_ports
         self.available_agent_to_agent_addresses = ["localhost" for i in range(self.n_jobs)]
-
         pass
 
     def _init_master_solver_pipe(self):
@@ -135,58 +135,77 @@ class SolverOOP():
         self.master_to_agent_updates_sender = master_to_agent_updates_sender
         self.agent_from_master_updates_receiver = agent_from_master_updates_receiver
 
+    def stop(self):
+        """
+        Signals the solver to stop the running solving process gracefully.
+        """
+        if self.is_running:
+            self.logger.info("Stop signal received. Terminating solver...")
+            self.is_running = False
 
     def solve(self):
-
+        self.is_running = True
         agents = self._setup_agents()
         agents_process_pool = self._run_jobs(agents)
 
         start_time = time.perf_counter()
         steps_count = 0
-        while True:
+        
+        poller = zmq.Poller()
+        poller.register(self.master_to_agents_subscriber_socket, zmq.POLLIN)
 
-            received_individual, agent_id, agent_status, local_step = self.receive_agent_publication()
-            new_best_flag = False
-            if self.global_top_individual is None:
-                self.global_top_individual = received_individual
-            elif received_individual < self.global_top_individual:
-                self.global_top_individual = received_individual
-                self.update_global_top_solution()
-                new_best_flag = True
-            self.send_global_update(is_end=False)
-
-            total_time = time.perf_counter() - start_time
-            steps_count += 1
-            new_best_string = "New best score!" if new_best_flag else ""
-            if self.logging_level == LoggingLevel.FreshOnly and new_best_flag:
-                self.logger.info(f"Agent: {agent_id:4} Step {local_step} Best score: {self.global_top_individual.score}, Solving time: {total_time:.6f} {new_best_string}")
-
-            if len(self.observers) >= 1:
-                self._notify_observers(self.global_top_individual)
-
-            self.agent_statuses[agent_id] = agent_status
-            someone_alive = False
-            for agent_id in self.agent_statuses:
-                current_agent_status = self.agent_statuses[agent_id]
-                if current_agent_status == "alive":
-                    someone_alive = True
-                    break
-
-            if someone_alive is False:
-                self.send_global_update(is_end=True)
-                agents_process_pool.terminate()
-                agents_process_pool.join()
-                agents_process_pool.close()
-                del agents_process_pool
+        while self.is_running:
+            # Poll with a 100ms timeout to allow checking the is_running flag
+            sockets = dict(poller.poll(100))
+            
+            if self.master_to_agents_subscriber_socket in sockets and sockets[self.master_to_agents_subscriber_socket] == zmq.POLLIN:
+                received_individual, agent_id, agent_status, local_step = self.receive_agent_publication()
                 
-                # to prevent port binding errors in multistage scenario
-                del self.context
-                del self.master_to_agents_publisher_socket
-                del self.master_to_agents_subscriber_socket
+                new_best_flag = False
+                if self.global_top_individual is None:
+                    self.global_top_individual = received_individual
+                    self.update_global_top_solution()
+                    new_best_flag = True
+                elif received_individual < self.global_top_individual:
+                    self.global_top_individual = received_individual
+                    self.update_global_top_solution()
+                    new_best_flag = True
+                
+                self.send_global_update(is_end=False)
 
-                gc.collect()
-                break
+                total_time = time.perf_counter() - start_time
+                steps_count += 1
+                new_best_string = "New best score!" if new_best_flag else ""
+                if self.logging_level == LoggingLevel.FreshOnly and new_best_flag:
+                    self.logger.info(f"Agent: {agent_id:4} Step {local_step} Best score: {self.global_top_individual.score}, Solving time: {total_time:.6f} {new_best_string}")
 
+                if len(self.observers) >= 1:
+                    self._notify_observers()
+
+                self.agent_statuses[agent_id] = agent_status
+                if "alive" not in self.agent_statuses.values():
+                    self.logger.info("All agents have terminated naturally.")
+                    self.is_running = False
+
+        # --- Loop has ended, begin cleanup ---
+        self.logger.info("Solver loop finished. Cleaning up resources.")
+        self.send_global_update(is_end=True)
+        time.sleep(0.5)
+
+        agents_process_pool.terminate()
+        agents_process_pool.join()
+        agents_process_pool.close()
+        del agents_process_pool
+        
+        self.master_to_agents_publisher_socket.close()
+        self.master_to_agents_subscriber_socket.close()
+        self.context.term()
+
+        del self.context
+        del self.master_to_agents_publisher_socket
+        del self.master_to_agents_subscriber_socket
+
+        gc.collect()
         return self.global_top_solution     
 
     def _run_jobs(self, agents):
@@ -202,7 +221,6 @@ class SolverOOP():
             raise Exception("parallelization_backend must be value of enum ParallelizationBackend from greyjack.agents.base module")
         agents_process_pool.ncpus = self.n_jobs
         agents_process_pool.imap(run_agent_solving, agents)
-
         return agents_process_pool
 
     def _setup_agents(self):
@@ -243,7 +261,6 @@ class SolverOOP():
             for i in range(self.n_jobs):
                 next_agent_id = (i + 1) % self.n_jobs
                 agents[i].next_agent_address = deepcopy(agents[next_agent_id].agent_address_for_other_agents)
-
         return agents
 
     def receive_agent_publication(self):
@@ -265,7 +282,7 @@ class SolverOOP():
 
     def send_global_update(self, is_end):
 
-        if self.is_agent_wins_from_comparing_with_global:
+        if self.is_agent_wins_from_comparing_with_global and self.global_top_individual is not None:
             master_publication = [self.global_top_individual.as_list(), self.is_variables_info_received, is_end]
         else:
             master_publication = [None, self.is_variables_info_received, is_end]
@@ -274,10 +291,10 @@ class SolverOOP():
         self.master_to_agents_publisher_socket.send( master_publication )
 
     def update_global_top_solution(self):
-        individual_list = self.global_top_individual.as_list()
-        self.global_top_solution = GJSolution(self.variable_names, self.discrete_ids, individual_list[0], individual_list[1], self.score_precision)
+        if self.global_top_individual and self.variable_names:
+            individual_list = self.global_top_individual.as_list()
+            self.global_top_solution = GJSolution(self.variable_names, self.discrete_ids, individual_list[0], individual_list[1], self.score_precision)
         pass
-
     
     def register_observer(self, observer):
         self.observers.append(observer)
