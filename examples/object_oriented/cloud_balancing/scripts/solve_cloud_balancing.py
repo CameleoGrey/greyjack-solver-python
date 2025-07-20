@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
 
     domain_builder = DomainBuilder(file_path)
-    cotwin_builder = CotwinBuilder(use_incremental_score_calculator=True, use_greed_init=True)
+    cotwin_builder = CotwinBuilder(scorer_name="pseudo", use_greed_init=True)
 
     #termination_strategy = StepsLimit(step_count_limit=1000)
     #termination_strategy = TimeSpentLimit(time_seconds_limit=60)

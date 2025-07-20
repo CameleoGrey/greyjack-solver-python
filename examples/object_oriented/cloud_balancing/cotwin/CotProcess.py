@@ -1,6 +1,7 @@
 
+from greyjack.score_calculation.greynet.greynet_fact import greynet_fact
 
-
+@greynet_fact
 class CotProcess():
 
     def __init__(self, process_id, cpu_power_req, memory_size_req, network_bandwidth_req, computer_id):

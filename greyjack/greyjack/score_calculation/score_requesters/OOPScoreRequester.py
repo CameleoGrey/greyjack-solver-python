@@ -70,9 +70,11 @@ class OOPScoreRequester:
 
             if type(attribute_value) in {GJFloat, GJInteger, GJBinary}:
                 value = attribute_value.planning_variable.initial_value
-
                 if value is None:
                     raise ValueError("All planning variables must have initial value for scoring by greynet")
+                
+                #if type(attribute_value) in {GJInteger, GJBinary}:
+                #    value = int(value)
             else:
                 value = attribute_value
             

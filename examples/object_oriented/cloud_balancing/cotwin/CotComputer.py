@@ -1,6 +1,8 @@
 
 
+from greyjack.score_calculation.greynet.greynet_fact import greynet_fact
 
+@greynet_fact
 class CotComputer():
 
     def __init__(self, computer_id, cpu_power, memory_size, network_bandwidth, cost):

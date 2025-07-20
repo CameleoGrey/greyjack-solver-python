@@ -6,14 +6,15 @@ from examples.object_oriented.cloud_balancing.cotwin.CotProcess import CotProces
 from examples.object_oriented.cloud_balancing.cotwin.CotComputer import CotComputer
 from examples.object_oriented.cloud_balancing.score.PlainScoreCalculatorCB import PlainScoreCalculatorCB
 from examples.object_oriented.cloud_balancing.score.IncrementalScoreCalculatorCB import IncrementalScoreCalculatorCB
+from examples.object_oriented.cloud_balancing.score.GreynetScoreCalculatorCB import GreynetScoreCalculatorCB
 import numpy as np
 from numba import jit
 
 class CotwinBuilder(CotwinBuilderBase):
 
-    def __init__(self, use_incremental_score_calculator, use_greed_init):
+    def __init__(self, scorer_name, use_greed_init):
 
-        self.use_incremental_score_calculator = use_incremental_score_calculator
+        self.scorer_name = scorer_name
         self.use_greed_init = use_greed_init
 
         pass
@@ -25,15 +26,22 @@ class CotwinBuilder(CotwinBuilderBase):
         cotwin_model.add_planning_entities_list(self._build_planning_processes(domain_model), "processes")
         cotwin_model.add_problem_facts_list(self._build_problem_fact_computers(domain_model), "computers")
 
-        if self.use_incremental_score_calculator:
+        if self.scorer_name == "plain":
+            score_calculator = PlainScoreCalculatorCB()
+        if self.scorer_name == "pseudo":
             score_calculator = IncrementalScoreCalculatorCB()
 
             #to avoid joining, fast get common info only
             score_calculator.utility_objects["processes_info"] = self._build_processes_common_info(domain_model)
             score_calculator.utility_objects["computers_info"] = self._build_computers_common_info(domain_model)
             score_calculator.utility_objects["computers_costs"] = self._build_computers_costs(domain_model)
+        elif self.scorer_name == "greynet_plain":
+            score_calculator = GreynetScoreCalculatorCB()
+            score_calculator.is_incremental = False
+        elif self.scorer_name == "greynet_incremental":
+            score_calculator = GreynetScoreCalculatorCB()
         else:
-            score_calculator = PlainScoreCalculatorCB()
+            raise ValueError("Available score calculators: plain, pseudo, greynet")
 
         cotwin_model.set_score_calculator( score_calculator )
 
