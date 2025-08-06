@@ -3,7 +3,7 @@
 use pyo3::prelude::*;
 use crate::variables::GJPlanningVariable;
 use polars::prelude::*;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 
 use rand::SeedableRng;
 use rand::rngs::StdRng;
@@ -69,7 +69,7 @@ impl VariablesManager {
 
     pub fn build_semantic_groups_dict(variables_vec: &Vec<GJPlanningVariable>) -> HashMap<String, Vec<usize>> {
 
-        let mut semantic_groups_dict: HashMap<String, Vec<usize>> = HashMap::new();
+        let mut semantic_groups_dict: HashMap<String, Vec<usize>> = HashMap::default();
         for i in 0..variables_vec.len() {
             let variable = &variables_vec[i];
             let variable_semantic_groups = &variable.semantic_groups;

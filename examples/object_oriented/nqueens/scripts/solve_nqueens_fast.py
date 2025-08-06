@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
     solver = SolverOOP(domain_builder, cotwin_builder, agent, 
                     ParallelizationBackend.Multiprocessing, LoggingLevel.FreshOnly,
-                    n_jobs=10, score_precision=[0])
+                    n_jobs=4, score_precision=[0])
     solution = solver.solve()
     #print( "Cotwin solution looks that: " )
     #print( solution )

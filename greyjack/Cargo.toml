@@ -1,6 +1,6 @@
 [package]
 name = "greyjack"
-version = "0.3.7"
+version = "0.3.8"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -18,6 +18,8 @@ ndarray-rand = "0.15.0"
 ndarray-stats = "0.6.0"
 chrono = "0.4.39"
 polars = { version = "0.46.0", features = ["lazy", "ndarray", "serde", "abs"] }
+once_cell = "1.21.3"
+rustc-hash = "2.1.1"
 
 # if you build lib from source code
 # uncomment to gain max performance (increases calculation speed about ~10%, 

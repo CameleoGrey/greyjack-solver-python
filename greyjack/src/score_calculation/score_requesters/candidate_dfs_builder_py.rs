@@ -45,12 +45,12 @@ impl CandidateDfsBuilderPy {
             )
         }).collect();
 
-        let mut planning_entity_dfs: HashMap<String, DataFrame> = HashMap::new();
+        let mut planning_entity_dfs: HashMap<String, DataFrame> = HashMap::default();
         planning_entity_dfs_py.iter().for_each(|(df_name, pydf)| {
             planning_entity_dfs.insert(df_name.clone(), pydf.clone().into());
         });
 
-        let mut problem_fact_dfs: HashMap<String, DataFrame> = HashMap::new();
+        let mut problem_fact_dfs: HashMap<String, DataFrame> = HashMap::default();
         problem_fact_dfs_py.iter().for_each(|(df_name, pydf)| {
             problem_fact_dfs.insert(df_name.clone(), pydf.clone().into());
         });
@@ -65,15 +65,15 @@ impl CandidateDfsBuilderPy {
             
             variables_manager: VariablesManager::new(variables_vec),
 
-            var_name_to_df_col_names: HashMap::new(),
+            var_name_to_df_col_names: HashMap::default(),
             var_name_to_vec_id_map: var_name_to_vec_id_map,
             vec_id_to_var_name_map: vec_id_to_var_name_map,
-            df_column_to_var_ids_map: HashMap::new(),
+            df_column_to_var_ids_map: HashMap::default(),
             var_id_to_df_column_index_map: Vec::new(),
             var_id_to_df_name: Vec::new(),
             var_id_to_col_name: Vec::new(),
 
-            cached_sample_id_vectors: HashMap::new(),
+            cached_sample_id_vectors: HashMap::default(),
             cached_sample_size: 999_999_999
 
         };
@@ -88,12 +88,12 @@ impl CandidateDfsBuilderPy {
 
         let (planning_entity_dfs, problem_fact_dfs) = self.candidate_dfs_builder.get_plain_candidate_dfs(&samples);
         
-        let mut planning_entity_dfs_py: HashMap<String, PyDataFrame> = HashMap::new();
+        let mut planning_entity_dfs_py: HashMap<String, PyDataFrame> = HashMap::default();
         planning_entity_dfs.iter().for_each(|(df_name, df)| {
             planning_entity_dfs_py.insert(df_name.clone(), PyDataFrame(df.clone()));
         });
 
-        let mut problem_fact_dfs_py: HashMap<String, PyDataFrame> = HashMap::new();
+        let mut problem_fact_dfs_py: HashMap<String, PyDataFrame> = HashMap::default();
         problem_fact_dfs.iter().for_each(|(df_name, df)| {
             problem_fact_dfs_py.insert(df_name.clone(), PyDataFrame(df.clone()));
         });
@@ -109,17 +109,17 @@ impl CandidateDfsBuilderPy {
         
         let (planning_entity_dfs, problem_fact_dfs, delta_dfs) = self.candidate_dfs_builder.get_incremental_candidate_dfs(&sample, &deltas);
 
-        let mut planning_entity_dfs_py: HashMap<String, PyDataFrame> = HashMap::new();
+        let mut planning_entity_dfs_py: HashMap<String, PyDataFrame> = HashMap::default();
         planning_entity_dfs.iter().for_each(|(df_name, df)| {
             planning_entity_dfs_py.insert(df_name.clone(), PyDataFrame(df.clone()));
         });
 
-        let mut problem_fact_dfs_py: HashMap<String, PyDataFrame> = HashMap::new();
+        let mut problem_fact_dfs_py: HashMap<String, PyDataFrame> = HashMap::default();
         problem_fact_dfs.iter().for_each(|(df_name, df)| {
             problem_fact_dfs_py.insert(df_name.clone(), PyDataFrame(df.clone()));
         });
 
-        let mut delta_dfs_py: HashMap<String, PyDataFrame> = HashMap::new();
+        let mut delta_dfs_py: HashMap<String, PyDataFrame> = HashMap::default();
         delta_dfs.iter().for_each(|(df_name, df)| {
             delta_dfs_py.insert(df_name.clone(), PyDataFrame(df.clone()));
         });

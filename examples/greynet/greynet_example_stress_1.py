@@ -136,7 +136,7 @@ def main():
     
     # --- Configuration ---
     NUM_CUSTOMERS = 10_000
-    NUM_TRANSACTIONS = 100_000
+    NUM_TRANSACTIONS = 10_000_000
     NUM_LOCATIONS = 1_000
     
     print("### Starting Rule Engine Stress Test (Windows Compatible) ###")

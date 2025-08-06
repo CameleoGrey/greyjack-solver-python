@@ -54,15 +54,15 @@ impl CandidateDfsBuilder {
                 
                 variables_manager: VariablesManager::new(variables_vec),
 
-                var_name_to_df_col_names: HashMap::new(),
+                var_name_to_df_col_names: HashMap::default(),
                 var_name_to_vec_id_map: var_name_to_vec_id_map,
                 vec_id_to_var_name_map: vec_id_to_var_name_map,
-                df_column_to_var_ids_map: HashMap::new(),
+                df_column_to_var_ids_map: HashMap::default(),
                 var_id_to_df_column_index_map: Vec::new(),
                 var_id_to_df_name: Vec::new(),
                 var_id_to_col_name: Vec::new(),
 
-                cached_sample_id_vectors: HashMap::new(),
+                cached_sample_id_vectors: HashMap::default(),
                 cached_sample_size: 999_999_999
 
             };
@@ -124,7 +124,7 @@ impl CandidateDfsBuilder {
 
         fn build_var_mappings(&mut self) -> HashMap<(String, String), Vec<usize>> {
             let variable_names= self.variables_manager.get_variables_names_vec();
-            let mut df_column_var_ids: HashMap<(String, String), Vec<usize>> = HashMap::new();
+            let mut df_column_var_ids: HashMap<(String, String), Vec<usize>> = HashMap::default();
             variable_names.iter().enumerate().for_each(|(i, var_name)| {
                 let (df_name, column_name) = &Self::get_df_column_name(var_name.clone());
 
@@ -149,11 +149,11 @@ impl CandidateDfsBuilder {
                 self.df_column_to_var_ids_map = self.build_var_mappings();
             }
 
-            let mut group_data_map: HashMap<String, HashMap<String, Vec<f64>>> = HashMap::new();
+            let mut group_data_map: HashMap<String, HashMap<String, Vec<f64>>> = HashMap::default();
 
             for (df_name, col_name) in self.df_column_to_var_ids_map.keys() {
                 if group_data_map.contains_key(df_name) == false {
-                    group_data_map.insert(df_name.clone(), HashMap::new());
+                    group_data_map.insert(df_name.clone(), HashMap::default());
                 }
                 group_data_map.get_mut(df_name).unwrap().insert(col_name.clone(), Vec::new());
             }
@@ -212,7 +212,7 @@ impl CandidateDfsBuilder {
         pub fn build_var_id_to_df_column_index_map(&mut self) -> Vec<(String, String, usize)> {
 
             let mut var_id_to_df_column_index_map: Vec<(String, String, usize)> = Vec::new();
-            let mut increment_row_id_map: HashMap<(&String, &String), usize> = HashMap::new();
+            let mut increment_row_id_map: HashMap<(&String, &String), usize> = HashMap::default();
 
             var_id_to_df_column_index_map = 
             self.var_id_to_df_name
@@ -246,7 +246,7 @@ impl CandidateDfsBuilder {
                 self.var_id_to_df_column_index_map = self.build_var_id_to_df_column_index_map();
             }
 
-            let mut delta_data_map: HashMap<String, HashMap<String, Vec<f64>>> = HashMap::new();
+            let mut delta_data_map: HashMap<String, HashMap<String, Vec<f64>>> = HashMap::default();
             (0..inverted_deltas.len()).into_iter().for_each(|sample_id| {
 
                 let current_sample_deltas = inverted_deltas[sample_id].clone();
@@ -254,7 +254,7 @@ impl CandidateDfsBuilder {
 
                     let (df_name, var_col_name, row_id) = self.var_id_to_df_column_index_map[*var_id].clone();
                     if delta_data_map.contains_key(&df_name) == false {
-                        delta_data_map.insert(df_name.clone(), HashMap::new());
+                        delta_data_map.insert(df_name.clone(), HashMap::default());
                         delta_data_map.get_mut(&df_name).unwrap().insert("sample_id".to_string(), Vec::new());
                         delta_data_map.get_mut(&df_name).unwrap().insert("candidate_df_row_id".to_string(), Vec::new());
                     }
@@ -277,7 +277,7 @@ impl CandidateDfsBuilder {
                 });
             });
 
-            let mut delta_dfs: HashMap<String, DataFrame> = HashMap::new();
+            let mut delta_dfs: HashMap<String, DataFrame> = HashMap::default();
             delta_data_map.keys().into_iter().for_each(|df_name| {
 
                 let mut current_df = DataFrame::empty();

@@ -40,7 +40,7 @@ macro_rules! build_concrete_late_acceptance_base {
                     Some(x) => current_mutation_rate_multiplier = mutation_rate_multiplier.unwrap(),
                     None => current_mutation_rate_multiplier = 0.0,
                 }
-                let mut group_mutation_rates_map: HashMap<String, f64> = HashMap::new();
+                let mut group_mutation_rates_map: HashMap<String, f64> = HashMap::default();
                 for group_name in semantic_groups_map.keys() {
                     let group_size = semantic_groups_map[group_name].len();
                     let current_group_mutation_rate = current_mutation_rate_multiplier * (1.0 / (group_size as f64));
@@ -58,7 +58,7 @@ macro_rules! build_concrete_late_acceptance_base {
 
                     group_mutation_rates_map: group_mutation_rates_map.clone(),
                     discrete_ids: discrete_ids.clone(),
-                    mover: Mover::new(tabu_entity_rate, HashMap::new(), HashMap::new(), HashMap::new(), group_mutation_rates_map.clone(), move_probas),
+                    mover: Mover::new(tabu_entity_rate, HashMap::default(), HashMap::default(), HashMap::default(), group_mutation_rates_map.clone(), move_probas),
                     variables_manager: VariablesManager::new(variables_manager_py.variables_vec.clone()),
                 }
             }
@@ -72,7 +72,7 @@ macro_rules! build_concrete_late_acceptance_base {
                 if self.mover.tabu_entity_size_map.len() == 0 {
                     let semantic_groups_map = self.variables_manager.semantic_groups_map.clone();
                     for (group_name, group_ids) in semantic_groups_map {
-                        self.mover.tabu_ids_sets_map.insert(group_name.clone(), HashSet::new());
+                        self.mover.tabu_ids_sets_map.insert(group_name.clone(), HashSet::default());
                         self.mover.tabu_entity_size_map.insert(group_name.clone(), max((self.tabu_entity_rate * (group_ids.len() as f64)).ceil() as usize, 1));
                         self.mover.tabu_ids_vecdeque_map.insert(group_name.clone(), VecDeque::new());
                     }
@@ -97,7 +97,7 @@ macro_rules! build_concrete_late_acceptance_base {
                 if self.mover.tabu_entity_size_map.len() == 0 {
                     let semantic_groups_map = self.variables_manager.semantic_groups_map.clone();
                     for (group_name, group_ids) in semantic_groups_map {
-                        self.mover.tabu_ids_sets_map.insert(group_name.clone(), HashSet::new());
+                        self.mover.tabu_ids_sets_map.insert(group_name.clone(), HashSet::default());
                         self.mover.tabu_entity_size_map.insert(group_name.clone(), max((self.tabu_entity_rate * (group_ids.len() as f64)).ceil() as usize, 1));
                         self.mover.tabu_ids_vecdeque_map.insert(group_name.clone(), VecDeque::new());
                     }

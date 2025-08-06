@@ -6,7 +6,8 @@ use pyo3::pycell::*;
 
 use crate::variables::{GJPlanningVariable, GJPlanningVariablePy};
 use polars::prelude::*;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
+use crate::utils::rng_utils::RngUtils;
 
 use rand::SeedableRng;
 use rand::rngs::StdRng;
@@ -104,27 +105,27 @@ impl VariablesManagerPy {
     }
 
     pub fn get_random_semantic_group_ids(&self) -> (&Vec<usize>, &String) {
-        let random_group_id = Uniform::new(0, self.n_semantic_groups).sample(&mut StdRng::from_entropy());
+        let random_group_id = RngUtils::get_random_id(0, self.n_semantic_groups);
         let group_name = &self.semantic_group_keys[random_group_id];
         let group_ids = self.semantic_groups_map.get(group_name).unwrap();
-        return (group_ids, group_name);
-    }
-    
-    pub fn get_column_random_value(&self, column_id: usize) -> f64{
-        Uniform::new(self.lower_bounds[column_id], self.upper_bounds[column_id]).sample(&mut StdRng::from_entropy())
+        (group_ids, group_name)
     }
 
+    // FIXED: Use centralized RNG
+    pub fn get_column_random_value(&self, column_id: usize) -> f64 {
+        RngUtils::get_random_f64_range(self.lower_bounds[column_id], self.upper_bounds[column_id])
+    }
+
+    // FIXED: Use centralized RNG for variable sampling
     pub fn sample_variables(&mut self) -> Vec<f64> {
-
-        let mut values_array: Vec<f64> = vec![0.0; self.variables_count];
-        for i in 0..self.variables_count {
-
-            let variable = &mut self.variables_vec[i];
+        let mut values_array: Vec<f64> = Vec::with_capacity(self.variables_count);
+        
+        for variable in &self.variables_vec {
             let generated_value = variable.get_initial_value();
-            values_array[i] = generated_value;
+            values_array.push(generated_value);
         }
 
-        return values_array;
+        values_array
     }
 
     pub fn get_variables_names_vec(&self) -> Vec<String> {

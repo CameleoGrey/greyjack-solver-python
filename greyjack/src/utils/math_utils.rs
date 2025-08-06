@@ -1,27 +1,31 @@
 
-use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
-use rand_distr::{Distribution, Uniform};
-use std::{collections::HashSet, hash::Hash};
+use rand::prelude::SliceRandom;
+use super::rng_utils::RngUtils;
 
 pub fn rint(x: f64) -> f64 {
-    if (x - x.floor()).abs() < (x.ceil() - x).abs() {x.floor()} else {x.ceil()}
+    if (x - x.floor()).abs() < (x.ceil() - x).abs() {
+        x.floor()
+    } else {
+        x.ceil()
+    }
 }
 
 pub fn round(value: f64, precision: u64) -> f64 {
-    let multiplier = (10.0 as f64).powf(precision as f64);
+    let multiplier = (10.0_f64).powf(precision as f64);
     value.floor() + ((value - value.floor()) * multiplier).floor() / multiplier
 }
 
+// FIXED: Use centralized RNG instead of creating new instances
 pub fn get_random_id(start_id: usize, end_exclusive: usize) -> usize {
-    Uniform::new(start_id, end_exclusive).sample(&mut StdRng::from_entropy())
+    RngUtils::get_random_id(start_id, end_exclusive)
 }
 
-pub fn choice<T>(objects: &Vec<T>, n: usize, replace: bool) -> Vec<T>
-where T: Clone {
-    if replace == true {
-        choice_with_replacement(objects, n)
+// FIXED: Use centralized RNG for choice functions
+pub fn choice<T: Clone>(objects: &[T], n: usize, replace: bool) -> Vec<T> {
+    if replace {
+        RngUtils::choice_with_replacement(objects, n)
     } else {
-        choice_without_replacement(objects, n)
+        RngUtils::choice_without_replacement(objects, n)
     }
 }
 
@@ -33,19 +37,6 @@ where T: Clone {
     return chosen_objects;
 }
 
-fn choice_without_replacement<T>(objects: &Vec<T>, n: usize) -> Vec<T>
-where T: Clone {
-
-    if n > objects.len() {
-        panic!("There are less objects tnan can be chosen from collection without replacement");
-    }
-    
-    let mut random_ids:Vec<usize> = (0..objects.len()).collect();
-    random_ids.shuffle(&mut StdRng::from_entropy());
-    let chosen_objects: Vec<T> = (0..n).into_iter().map(|i| objects[random_ids[i]].clone()).collect();
-
-    return chosen_objects;
-}
 
 /*pub fn select_non_tabu_ids<T>(objects: &Vec<T>, n: usize, group: bool) -> Vec<T>
 where T: Clone {
