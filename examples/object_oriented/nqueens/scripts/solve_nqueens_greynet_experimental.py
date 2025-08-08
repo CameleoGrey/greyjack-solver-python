@@ -20,7 +20,7 @@ from greyjack.agents import *
 if __name__ == "__main__":
 
     # build domain model
-    domain_builder = DomainBuilderNQueens(16, random_seed=45)
+    domain_builder = DomainBuilderNQueens(1000, random_seed=45)
     cotwin_builder = CotwinBuilderNQueens(scorer_name="greynet_incremental")
 
     #domain = domain_builder.build_domain_from_scratch()
@@ -44,13 +44,13 @@ if __name__ == "__main__":
                             migration_frequency=10, compare_to_global_frequency=10, termination_strategy=termination_strategy)"""
 
     solver = SolverOOP(domain_builder, cotwin_builder, agent, 
-                    ParallelizationBackend.Threading, LoggingLevel.Info,
+                    ParallelizationBackend.Multiprocessing, LoggingLevel.FreshOnly,
                     n_jobs=1, score_precision=[0])
     solution = solver.solve()
     #print( "Cotwin solution looks that: " )
     #print( solution )
 
     domain = domain_builder.build_from_solution(solution)
-    print(domain)
+    #print(domain)
 
     print( "done" )
