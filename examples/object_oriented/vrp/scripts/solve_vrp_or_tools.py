@@ -1,316 +1,502 @@
 """
-                              Apache License
-                           Version 2.0, January 2004
-                        http://www.apache.org/licenses/
+Capacitated Vehicles Routing Problem with Time Windows and Multiple Depots (CVRPTW-MD).
 
-   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+This script uses Google OR-Tools to solve a complex vehicle routing problem that includes:
+- Multiple depots
+- Time windows for deliveries
+- Vehicle capacity constraints
+- Service times at each location
 
-   1. Definitions.
-
-      "License" shall mean the terms and conditions for use, reproduction,
-      and distribution as defined by Sections 1 through 9 of this document.
-
-      "Licensor" shall mean the copyright owner or entity authorized by
-      the copyright owner that is granting the License.
-
-      "Legal Entity" shall mean the union of the acting entity and all
-      other entities that control, are controlled by, or are under common
-      control with that entity. For the purposes of this definition,
-      "control" means (i) the power, direct or indirect, to cause the
-      direction or management of such entity, whether by contract or
-      otherwise, or (ii) ownership of fifty percent (50%) or more of the
-      outstanding shares, or (iii) beneficial ownership of such entity.
-
-      "You" (or "Your") shall mean an individual or Legal Entity
-      exercising permissions granted by this License.
-
-      "Source" form shall mean the preferred form for making modifications,
-      including but not limited to software source code, documentation
-      source, and configuration files.
-
-      "Object" form shall mean any form resulting from mechanical
-      transformation or translation of a Source form, including but
-      not limited to compiled object code, generated documentation,
-      and conversions to other media types.
-
-      "Work" shall mean the work of authorship, whether in Source or
-      Object form, made available under the License, as indicated by a
-      copyright notice that is included in or attached to the work
-      (an example is provided in the Appendix below).
-
-      "Derivative Works" shall mean any work, whether in Source or Object
-      form, that is based on (or derived from) the Work and for which the
-      editorial revisions, annotations, elaborations, or other modifications
-      represent, as a whole, an original work of authorship. For the purposes
-      of this License, Derivative Works shall not include works that remain
-      separable from, or merely link (or bind by name) to the interfaces of,
-      the Work and Derivative Works thereof.
-
-      "Contribution" shall mean any work of authorship, including
-      the original version of the Work and any modifications or additions
-      to that Work or Derivative Works thereof, that is intentionally
-      submitted to Licensor for inclusion in the Work by the copyright owner
-      or by an individual or Legal Entity authorized to submit on behalf of
-      the copyright owner. For the purposes of this definition, "submitted"
-      means any form of electronic, verbal, or written communication sent
-      to the Licensor or its representatives, including but not limited to
-      communication on electronic mailing lists, source code control systems,
-      and issue tracking systems that are managed by, or on behalf of, the
-      Licensor for the purpose of discussing and improving the Work, but
-      excluding communication that is conspicuously marked or otherwise
-      designated in writing by the copyright owner as "Not a Contribution."
-
-      "Contributor" shall mean Licensor and any individual or Legal Entity
-      on behalf of whom a Contribution has been received by Licensor and
-      subsequently incorporated within the Work.
-
-   2. Grant of Copyright License. Subject to the terms and conditions of
-      this License, each Contributor hereby grants to You a perpetual,
-      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
-      copyright license to reproduce, prepare Derivative Works of,
-      publicly display, publicly perform, sublicense, and distribute the
-      Work and such Derivative Works in Source or Object form.
-
-   3. Grant of Patent License. Subject to the terms and conditions of
-      this License, each Contributor hereby grants to You a perpetual,
-      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
-      (except as stated in this section) patent license to make, have made,
-      use, offer to sell, sell, import, and otherwise transfer the Work,
-      where such license applies only to those patent claims licensable
-      by such Contributor that are necessarily infringed by their
-      Contribution(s) alone or by combination of their Contribution(s)
-      with the Work to which such Contribution(s) was submitted. If You
-      institute patent litigation against any entity (including a
-      cross-claim or counterclaim in a lawsuit) alleging that the Work
-      or a Contribution incorporated within the Work constitutes direct
-      or contributory patent infringement, then any patent licenses
-      granted to You under this License for that Work shall terminate
-      as of the date such litigation is filed.
-
-   4. Redistribution. You may reproduce and distribute copies of the
-      Work or Derivative Works thereof in any medium, with or without
-      modifications, and in Source or Object form, provided that You
-      meet the following conditions:
-
-      (a) You must give any other recipients of the Work or
-          Derivative Works a copy of this License; and
-
-      (b) You must cause any modified files to carry prominent notices
-          stating that You changed the files; and
-
-      (c) You must retain, in the Source form of any Derivative Works
-          that You distribute, all copyright, patent, trademark, and
-          attribution notices from the Source form of the Work,
-          excluding those notices that do not pertain to any part of
-          the Derivative Works; and
-
-      (d) If the Work includes a "NOTICE" text file as part of its
-          distribution, then any Derivative Works that You distribute must
-          include a readable copy of the attribution notices contained
-          within such NOTICE file, excluding those notices that do not
-          pertain to any part of the Derivative Works, in at least one
-          of the following places: within a NOTICE text file distributed
-          as part of the Derivative Works; within the Source form or
-          documentation, if provided along with the Derivative Works; or,
-          within a display generated by the Derivative Works, if and
-          wherever such third-party notices normally appear. The contents
-          of the NOTICE file are for informational purposes only and
-          do not modify the License. You may add Your own attribution
-          notices within Derivative Works that You distribute, alongside
-          or as an addendum to the NOTICE text from the Work, provided
-          that such additional attribution notices cannot be construed
-          as modifying the License.
-
-      You may add Your own copyright statement to Your modifications and
-      may provide additional or different license terms and conditions
-      for use, reproduction, or distribution of Your modifications, or
-      for any such Derivative Works as a whole, provided Your use,
-      reproduction, and distribution of the Work otherwise complies with
-      the conditions stated in this License.
-
-   5. Submission of Contributions. Unless You explicitly state otherwise,
-      any Contribution intentionally submitted for inclusion in the Work
-      by You to the Licensor shall be under the terms and conditions of
-      this License, without any additional terms or conditions.
-      Notwithstanding the above, nothing herein shall supersede or modify
-      the terms of any separate license agreement you may have executed
-      with Licensor regarding such Contributions.
-
-   6. Trademarks. This License does not grant permission to use the trade
-      names, trademarks, service marks, or product names of the Licensor,
-      except as required for reasonable and customary use in describing the
-      origin of the Work and reproducing the content of the NOTICE file.
-
-   7. Disclaimer of Warranty. Unless required by applicable law or
-      agreed to in writing, Licensor provides the Work (and each
-      Contributor provides its Contributions) on an "AS IS" BASIS,
-      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
-      implied, including, without limitation, any warranties or conditions
-      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
-      PARTICULAR PURPOSE. You are solely responsible for determining the
-      appropriateness of using or redistributing the Work and assume any
-      risks associated with Your exercise of permissions under this License.
-
-   8. Limitation of Liability. In no event and under no legal theory,
-      whether in tort (including negligence), contract, or otherwise,
-      unless required by applicable law (such as deliberate and grossly
-      negligent acts) or agreed to in writing, shall any Contributor be
-      liable to You for damages, including any direct, indirect, special,
-      incidental, or consequential damages of any character arising as a
-      result of this License or out of the use or inability to use the
-      Work (including but not limited to damages for loss of goodwill,
-      work stoppage, computer failure or malfunction, or any and all
-      other commercial damages or losses), even if such Contributor
-      has been advised of the possibility of such damages.
-
-   9. Accepting Warranty or Additional Liability. While redistributing
-      the Work or Derivative Works thereof, You may choose to offer,
-      and charge a fee for, acceptance of support, warranty, indemnity,
-      or other liability obligations and/or rights consistent with this
-      License. However, in accepting such obligations, You may act only
-      on Your own behalf and on Your sole responsibility, not on behalf
-      of any other Contributor, and only if You agree to indemnify,
-      defend, and hold each Contributor harmless for any liability
-      incurred by, or claims asserted against, such Contributor by reason
-      of your accepting any such warranty or additional liability.
-
-   END OF TERMS AND CONDITIONS
-
-   APPENDIX: How to apply the Apache License to your work.
-
-      To apply the Apache License to your work, attach the following
-      boilerplate notice, with the fields enclosed by brackets "[]"
-      replaced with your own identifying information. (Don't include
-      the brackets!)  The text should be enclosed in the appropriate
-      comment syntax for the file format. We also recommend that a
-      file or class name and description of purpose be included on the
-      same "printed page" as the copyright notice for easier
-      identification within third-party archives.
-
-   Copyright [yyyy] [name of copyright owner]
-
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-
-       http://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
+The solution is optimized using guided local search with path cheapest arc as the first solution strategy.
 """
 
+from __future__ import annotations
 
+import os
+import random
+import sys
 from copy import deepcopy
 from pathlib import Path
-import random
-import os
-import sys
+from typing import Dict, List, Tuple, Any, Optional
+import matplotlib.pyplot as plt
+import numpy as np
+from datetime import datetime
+
+from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 
 # To launch normally from console
 script_dir_path = Path(os.path.dirname(os.path.realpath(__file__)))
 project_dir_id = script_dir_path.parts.index("greyjack-solver-python")
-project_dir_path = Path(*script_dir_path.parts[:project_dir_id+1])
+project_dir_path = Path(*script_dir_path.parts[:project_dir_id + 1])
 sys.path.append(str(project_dir_path))
 
 from examples.object_oriented.vrp.persistence.DomainBuilder import DomainBuilder
 from greyjack.agents.termination_strategies import *
 
-"""Capacited Vehicles Routing Problem (CVRP)."""
+# Configuration constants
+DEFAULT_SPEED_KMH = 50.0  # Default vehicle speed in km/h
+MAX_TIME_PER_VEHICLE = 100000  # Maximum time per vehicle in minutes
+ALLOWED_WAITING_TIME = 30  # Allowed waiting time in minutes
+SOLVE_TIME_LIMIT_SECONDS = 600  # Time limit for solving in seconds
 
-from ortools.constraint_solver import routing_enums_pb2
-from ortools.constraint_solver import pywrapcp
-
-
-def create_data_model():
-
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    # simple VRP datasets (without multi-depot and time windows)
-    data_dir_path = Path(project_dir_path, "data", "vrp", "data", "import")
-    #file_path = Path(data_dir_path, "vrpweb", "basic", "air", "A-n32-k5.vrp")
-    #file_path = Path(data_dir_path, "vrpweb", "basic", "air", "F-n135-k7.vrp")
-    #file_path = Path(data_dir_path, "usa", "basic", "air", "usa-n100-k10.vrp")
-    file_path = Path(data_dir_path, "belgium", "basic", "air", "belgium-n1000-k40.vrp")
-
-    # Warning! For datasets without predefined distances, custom distances are multiplied by 1000 and rounded to int
-    # Inside output true distances without rounding are using.
-    domain_model = DomainBuilder(file_path).build_domain_from_scratch()
-    distance_matrix = domain_model.distance_matrix
-    demands = [int(customer.demand) for customer in domain_model.customers_dict.values()]
-    k_vehicles = len(domain_model.vehicles)
-    capacities = [vehicle.capacity for vehicle in domain_model.vehicles]
-
-    """Stores the data for the problem."""
-    data = {}
-    data["distance_matrix"] = distance_matrix
-    data["demands"] = demands
-    data["vehicle_capacities"] = capacities
-    data["num_vehicles"] = k_vehicles
-    data["depot"] = 0
-    return data
+# File paths for different datasets
+DATA_DIR_PATH = Path(project_dir_path, "data", "vrp", "data", "import")
+#DEFAULT_DATASET_PATH = Path(DATA_DIR_PATH, "belgium", "multidepot-timewindowed", "air", "belgium-tw-d2-n50-k10.vrp")
+DEFAULT_DATASET_PATH = Path(DATA_DIR_PATH, "belgium", "multidepot-timewindowed", "air", "belgium-tw-d8-n1000-k40.vrp")
 
 
-def print_solution(data, manager, routing, solution):
-    """Prints solution on console."""
-    print(f"Objective: {solution.ObjectiveValue()}")
+
+class VRPDataModel:
+    """Data model for the Vehicle Routing Problem with Time Windows."""
+    
+    def __init__(self, file_path: Optional[Path] = None):
+        """
+        Initialize the VRP data model.
+        
+        Args:
+            file_path: Path to the VRP data file. If None, uses default dataset.
+        """
+        self.file_path = file_path or DEFAULT_DATASET_PATH
+        self.domain_model = None
+        self.distance_matrix = []
+        self.demands = []
+        self.vehicle_capacities = []
+        self.num_vehicles = 0
+        self.num_depots = 0
+        self.depot_indices = []
+        self.starts = []
+        self.ends = []
+        self.time_windows = []
+        self.service_times = []
+        self.speed = DEFAULT_SPEED_KMH
+        
+    def build(self) -> Dict[str, Any]:
+        """Build the data model from the input file."""
+        self._parse_domain_data()
+        self._extract_basic_data()
+        self._configure_depots()
+        self._configure_vehicles()
+        self._extract_time_data()
+        
+        return self._create_data_dict()
+    
+    def _parse_domain_data(self) -> None:
+        """Parse the domain data from the input file."""
+        self.domain_model = DomainBuilder(self.file_path).build_domain_from_scratch()
+        self.distance_matrix = self.domain_model.distance_matrix
+        
+    def _extract_basic_data(self) -> None:
+        """Extract basic VRP data from the domain model."""
+        self.demands = [int(customer.demand) for customer in self.domain_model.customers_dict.values()]
+        self.num_vehicles = len(self.domain_model.vehicles)
+        self.vehicle_capacities = [vehicle.capacity for vehicle in self.domain_model.vehicles]
+        
+    def _configure_depots(self) -> None:
+        """Configure depot information from the domain model."""
+        depot_dict = self.domain_model.depot_dict
+        self.depot_indices = []
+        
+        # Map depot IDs to their array indices
+        for depot_id in depot_dict.values():
+            for i, customer in enumerate(self.domain_model.customers_dict.values()):
+                if customer.id == depot_id:
+                    self.depot_indices.append(i)
+                    break
+        
+        # Ensure depots have no demand
+        for i in self.depot_indices:
+            if i < len(self.demands):
+                self.demands[i] = 0
+                
+        self.num_depots = len(self.depot_indices)
+    
+    def _configure_vehicles(self) -> None:
+        """Configure vehicle start and end locations."""
+        self.starts = []
+        self.ends = []
+        
+        # Assign vehicles to depots by cycling through them
+        for i in range(self.num_vehicles):
+            depot_for_this_vehicle = self.depot_indices[i % len(self.depot_indices)]
+            self.starts.append(depot_for_this_vehicle)
+            self.ends.append(depot_for_this_vehicle)
+    
+    def _extract_time_data(self) -> None:
+        """Extract time window and service time data."""
+        num_locations = len(self.distance_matrix)
+        self.service_times = []
+        self.time_windows = []
+        
+        for i in range(num_locations):
+            customer = self.domain_model.customers_dict[i]
+            self.service_times.append(int(customer.service_time))
+            self.time_windows.append((int(customer.time_window_start), int(customer.time_window_end)))
+    
+    def _create_data_dict(self) -> Dict[str, Any]:
+        """Create the data dictionary for the OR-Tools solver."""
+        return {
+            "distance_matrix": self.distance_matrix,
+            "demands": self.demands,
+            "vehicle_capacities": self.vehicle_capacities,
+            "num_vehicles": self.num_vehicles,
+            "num_depots": self.num_depots,
+            "starts": self.starts,
+            "ends": self.ends,
+            "depot_indices": self.depot_indices,
+            "time_windows": self.time_windows,
+            "service_times": self.service_times,
+            "speed": self.speed,
+            "domain_model": self.domain_model,
+            "dataset_name": self.domain_model.name if self.domain_model else "Unknown"
+        }
+
+
+def create_data_model(file_path: Optional[Path] = None) -> Dict[str, Any]:
+    """
+    Create the data model for the CVRPTW-MD problem.
+    
+    Args:
+        file_path: Path to the VRP data file. If None, uses default dataset.
+        
+    Returns:
+        Dictionary containing all the problem data.
+    """
+    data_model = VRPDataModel(file_path)
+    return data_model.build()
+
+
+def print_solution(data: Dict[str, Any], manager: pywrapcp.RoutingIndexManager,
+                  routing: pywrapcp.RoutingModel, solution: pywrapcp.Assignment) -> None:
+    """
+    Print the solution to the console in a formatted way.
+    
+    Args:
+        data: The problem data dictionary.
+        manager: The routing index manager.
+        routing: The routing model.
+        solution: The solution found by the solver.
+    """
+    print_solution_pretty(data, manager, routing, solution)
+    plot_solution(data, manager, routing, solution)
+
+
+def print_solution_pretty(data: Dict[str, Any], manager: pywrapcp.RoutingIndexManager,
+                         routing: pywrapcp.RoutingModel, solution: pywrapcp.Assignment) -> None:
+    """
+    Print the solution in a visually appealing format with colors and structure.
+    
+    Args:
+        data: The problem data dictionary.
+        manager: The routing index manager.
+        routing: The routing model.
+        solution: The solution found by the solver.
+    """
+    # ANSI color codes for terminal output
+    class Colors:
+        HEADER = '\033[95m'
+        BLUE = '\033[94m'
+        CYAN = '\033[96m'
+        GREEN = '\033[92m'
+        YELLOW = '\033[93m'
+        RED = '\033[91m'
+        ENDC = '\033[0m'
+        BOLD = '\033[1m'
+        UNDERLINE = '\033[4m'
+    
+    print(f"\n{Colors.HEADER}{Colors.BOLD}{'='*60}{Colors.ENDC}")
+    print(f"{Colors.HEADER}{Colors.BOLD}CVRPTW-MD Solution Report{Colors.ENDC}")
+    print(f"{Colors.HEADER}{Colors.BOLD}{'='*60}{Colors.ENDC}")
+    print(f"{Colors.CYAN}Objective Value: {solution.ObjectiveValue()}{Colors.ENDC}")
+    print(f"{Colors.CYAN}Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{Colors.ENDC}")
+    print(f"{Colors.HEADER}{Colors.BOLD}{'='*60}{Colors.ENDC}\n")
+    
     total_distance = 0
     total_load = 0
+    total_time = 0
+    time_dimension = routing.GetDimensionOrDie("Time")
+    route_info = []
+    
     for vehicle_id in range(data["num_vehicles"]):
         index = routing.Start(vehicle_id)
-        plan_output = f"Route for vehicle {vehicle_id}:\n"
+        start_node = manager.IndexToNode(index)
+        
         route_distance = 0
         route_load = 0
+        route_nodes = []
+        route_times = []
+        
         while not routing.IsEnd(index):
             node_index = manager.IndexToNode(index)
+            time_var = time_dimension.CumulVar(index)
+            time_min = solution.Min(time_var)
+            
             route_load += data["demands"][node_index]
-            plan_output += f" {node_index} Load({route_load}) -> "
+            route_nodes.append(node_index)
+            route_times.append(time_min)
+            
             previous_index = index
             index = solution.Value(routing.NextVar(index))
             route_distance += routing.GetArcCostForVehicle(
                 previous_index, index, vehicle_id
             )
-        plan_output += f" {manager.IndexToNode(index)} Load({route_load})\n"
-        plan_output += f"Distance of the route: {route_distance}m\n"
-        plan_output += f"Load of the route: {route_load}\n"
-        print(plan_output)
+        
+        end_node = manager.IndexToNode(index)
+        time_var = time_dimension.CumulVar(index)
+        time_min = solution.Min(time_var)
+        
+        route_nodes.append(end_node)
+        route_times.append(time_min)
+        
+        # Calculate route time
+        route_time = route_times[-1] - route_times[0] if len(route_times) > 1 else 0
+        
+        # Store route information
+        route_info.append({
+            'vehicle_id': vehicle_id,
+            'start_node': start_node,
+            'end_node': end_node,
+            'nodes': route_nodes,
+            'times': route_times,
+            'distance': route_distance,
+            'load': route_load,
+            'time': route_time,
+            'capacity': data["vehicle_capacities"][vehicle_id] if vehicle_id < len(data["vehicle_capacities"]) else 0
+        })
+        
         total_distance += route_distance
         total_load += route_load
-    print(f"Total distance of all routes: {total_distance}m")
-    print(f"Total load of all routes: {total_load}")
+        total_time += route_time
+    
+    # Print detailed route information
+    for i, route in enumerate(route_info):
+        if route['distance'] > 0:  # Only print routes with actual work
+            print(f"{Colors.GREEN}{Colors.BOLD}Vehicle {route['vehicle_id']} Route:{Colors.ENDC}")
+            print(f"  {Colors.YELLOW}Depot: {route['start_node']} -> {route['end_node']}{Colors.ENDC}")
+            print(f"  {Colors.YELLOW}Distance: {route['distance']:.1f}m | Time: {route['time']:.1f}min{Colors.ENDC}")
+            print(f"  {Colors.YELLOW}Load: {route['load']}/{route['capacity']} ({100*route['load']/route['capacity']:.1f}%){Colors.ENDC}")
+            
+            # Print route path
+            path_str = f"{Colors.BLUE}"
+            for j, (node, time) in enumerate(zip(route['nodes'], route['times'])):
+                if j == 0:
+                    path_str += f"Depot({node})"
+                elif j == len(route['nodes']) - 1:
+                    path_str += f" -> Depot({node})"
+                else:
+                    demand = data["demands"][node]
+                    path_str += f" -> {node}(D:{demand},T:{time})"
+            path_str += f"{Colors.ENDC}"
+            print(f"  {path_str}\n")
+    
+    # Print summary statistics
+    print(f"{Colors.HEADER}{Colors.BOLD}{'='*60}{Colors.ENDC}")
+    print(f"{Colors.HEADER}{Colors.BOLD}Summary Statistics{Colors.ENDC}")
+    print(f"{Colors.HEADER}{Colors.BOLD}{'='*60}{Colors.ENDC}")
+    print(f"{Colors.CYAN}Total Distance: {total_distance:.1f}m ({total_distance/1000:.2f}km){Colors.ENDC}")
+    print(f"{Colors.CYAN}Total Load: {total_load}{Colors.ENDC}")
+    print(f"{Colors.CYAN}Total Time: {total_time:.1f} minutes ({total_time/60:.2f} hours){Colors.ENDC}")
+    print(f"{Colors.CYAN}Active Vehicles: {sum(1 for r in route_info if r['distance'] > 0)}/{data['num_vehicles']}{Colors.ENDC}")
+    print(f"{Colors.CYAN}Average Distance per Vehicle: {total_distance/max(1, sum(1 for r in route_info if r['distance'] > 0)):.1f}m{Colors.ENDC}")
+    print(f"{Colors.CYAN}Average Load per Vehicle: {total_load/max(1, sum(1 for r in route_info if r['distance'] > 0)):.1f}{Colors.ENDC}")
+    print(f"{Colors.HEADER}{Colors.BOLD}{'='*60}{Colors.ENDC}\n")
+    
+    return route_info
 
 
-def main():
-    """Solve the CVRP problem."""
-    # Instantiate the data problem.
-    data = create_data_model()
+def plot_solution(data: Dict[str, Any], manager: pywrapcp.RoutingIndexManager,
+                  routing: pywrapcp.RoutingModel, solution: pywrapcp.Assignment) -> None:
+    """
+    Create a visual plot of the solution using matplotlib.
+    
+    Args:
+        data: The problem data dictionary.
+        manager: The routing index manager.
+        routing: The routing model.
+        solution: The solution found by the solver.
+    """
+    # Extract coordinates from the domain model
+    domain_model = data.get('domain_model')
+    if not domain_model:
+        print("Domain model not available for plotting. Skipping visualization.")
+        return
+    
+    # Create a figure and axis
+    plt.figure(figsize=(12, 10))
+    ax = plt.gca()
+    
+    # Plot all customers
+    customers = list(domain_model.customers_dict.values())
+    customer_x = [c.latitude for c in customers]
+    customer_y = [c.longitude for c in customers]
+    
+    # Separate depots and regular customers
+    depot_indices = data.get('depot_indices', [])
+    depot_x = [customers[i].latitude for i in depot_indices if i < len(customers)]
+    depot_y = [customers[i].longitude for i in depot_indices if i < len(customers)]
+    
+    regular_customer_indices = [i for i in range(len(customers)) if i not in depot_indices]
+    regular_customer_x = [customers[i].latitude for i in regular_customer_indices]
+    regular_customer_y = [customers[i].longitude for i in regular_customer_indices]
+    
+    # Plot depots
+    if depot_x:
+        ax.scatter(depot_x, depot_y, c='red', s=200, marker='s', label='Depots', zorder=3)
+        for i, (x, y) in enumerate(zip(depot_x, depot_y)):
+            ax.annotate(f"D{depot_indices[i]}", (x, y), xytext=(5, 5),
+                       textcoords='offset points', fontsize=8, fontweight='bold')
+    
+    # Plot regular customers
+    if regular_customer_x:
+        ax.scatter(regular_customer_x, regular_customer_y, c='blue', s=50, alpha=0.7,
+                  label='Customers', zorder=2)
+        for i in regular_customer_indices:
+            x, y = customers[i].latitude, customers[i].longitude
+            demand = data['demands'][i]
+            ax.annotate(f"{i}({demand})", (x, y), xytext=(3, 3),
+                       textcoords='offset points', fontsize=6)
+    
+    # Plot routes
+    time_dimension = routing.GetDimensionOrDie("Time")
+    colors = plt.cm.tab10(np.linspace(0, 1, data["num_vehicles"]))
+    
+    for vehicle_id in range(data["num_vehicles"]):
+        index = routing.Start(vehicle_id)
+        route_x = []
+        route_y = []
+        
+        while not routing.IsEnd(index):
+            node_index = manager.IndexToNode(index)
+            route_x.append(customers[node_index].latitude)
+            route_y.append(customers[node_index].longitude)
+            
+            previous_index = index
+            index = solution.Value(routing.NextVar(index))
+        
+        # Add the final node
+        node_index = manager.IndexToNode(index)
+        route_x.append(customers[node_index].latitude)
+        route_y.append(customers[node_index].longitude)
+        
+        # Only plot routes with actual work
+        if len(route_x) > 2:  # More than just depot to depot
+            ax.plot(route_x, route_y, color=colors[vehicle_id], linewidth=1.5,
+                   alpha=0.7, label=f'Vehicle {vehicle_id}')
+    
+    # Add title and legend
+    plt.title(f"CVRPTW-MD Solution - {data.get('dataset_name', 'Unknown Dataset')}", fontsize=14, fontweight='bold')
+    plt.xlabel('Latitude', fontsize=12)
+    plt.ylabel('Longitude', fontsize=12)
+    plt.legend(loc='best', fontsize=8)
+    plt.grid(True, alpha=0.3)
+    
+    # Add statistics as text
+    total_distance = 0
+    total_load = 0
+    active_vehicles = 0
+    
+    for vehicle_id in range(data["num_vehicles"]):
+        index = routing.Start(vehicle_id)
+        route_distance = 0
+        route_load = 0
+        has_work = False
+        
+        while not routing.IsEnd(index):
+            node_index = manager.IndexToNode(index)
+            route_load += data["demands"][node_index]
+            
+            previous_index = index
+            index = solution.Value(routing.NextVar(index))
+            route_distance += routing.GetArcCostForVehicle(
+                previous_index, index, vehicle_id
+            )
+            has_work = True
+        
+        if has_work:
+            total_distance += route_distance
+            total_load += route_load
+            active_vehicles += 1
+    
+    stats_text = f"Total Distance: {total_distance/1000:.2f}km\n"
+    stats_text += f"Total Load: {total_load}\n"
+    stats_text += f"Active Vehicles: {active_vehicles}/{data['num_vehicles']}"
+    
+    plt.text(0.02, 0.98, stats_text, transform=ax.transAxes, fontsize=10,
+             verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+    
+    plt.tight_layout()
+    plt.show()
 
-    # Create the routing index manager.
-    manager = pywrapcp.RoutingIndexManager(
-        len(data["distance_matrix"]), data["num_vehicles"], data["depot"]
-    )
 
-    # Create Routing Model.
-    routing = pywrapcp.RoutingModel(manager)
+def export_solution_to_file(data: Dict[str, Any], manager: pywrapcp.RoutingIndexManager,
+                           routing: pywrapcp.RoutingModel, solution: pywrapcp.Assignment,
+                           output_path: str = None) -> None:
+    """
+    Export the solution to a text file in a formatted way.
+    
+    Args:
+        data: The problem data dictionary.
+        manager: The routing index manager.
+        routing: The routing model.
+        solution: The solution found by the solver.
+        output_path: Path to save the output file. If None, generates a default name.
+    """
+    if output_path is None:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        dataset_name = data.get('dataset_name', 'unknown').replace('.vrp', '')
+        output_path = f"cvrptw_solution_{dataset_name}_{timestamp}.txt"
+    
+    with open(output_path, 'w') as f:
+        # Redirect print statements to file
+        import sys
+        original_stdout = sys.stdout
+        sys.stdout = f
+        
+        try:
+            print_solution_pretty(data, manager, routing, solution)
+        finally:
+            sys.stdout = original_stdout
+    
+    print(f"Solution exported to: {output_path}")
 
-    # Create and register a transit callback.
-    def distance_callback(from_index, to_index):
+
+def setup_distance_callback(routing: pywrapcp.RoutingModel, 
+                           manager: pywrapcp.RoutingIndexManager,
+                           data: Dict[str, Any]) -> int:
+    """
+    Set up the distance callback for the routing model.
+    
+    Args:
+        routing: The routing model.
+        manager: The routing index manager.
+        data: The problem data dictionary.
+        
+    Returns:
+        The transit callback index.
+    """
+    def distance_callback(from_index: int, to_index: int) -> int:
         """Returns the distance between the two nodes."""
-        # Convert from routing variable Index to distance matrix NodeIndex.
         from_node = manager.IndexToNode(from_index)
         to_node = manager.IndexToNode(to_index)
         return data["distance_matrix"][from_node][to_node]
 
     transit_callback_index = routing.RegisterTransitCallback(distance_callback)
-
-    # Define cost of each arc.
     routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
+    return transit_callback_index
 
-    # Add Capacity constraint.
-    def demand_callback(from_index):
+
+def setup_capacity_constraints(routing: pywrapcp.RoutingModel,
+                               manager: pywrapcp.RoutingIndexManager,
+                               data: Dict[str, Any]) -> None:
+    """
+    Set up capacity constraints for the routing model.
+    
+    Args:
+        routing: The routing model.
+        manager: The routing index manager.
+        data: The problem data dictionary.
+    """
+    def demand_callback(from_index: int) -> int:
         """Returns the demand of the node."""
-        # Convert from routing variable Index to demands NodeIndex.
         from_node = manager.IndexToNode(from_index)
         return data["demands"][from_node]
 
@@ -323,22 +509,131 @@ def main():
         "Capacity",
     )
 
-    # Setting first solution heuristic.
+
+def setup_time_constraints(routing: pywrapcp.RoutingModel,
+                          manager: pywrapcp.RoutingIndexManager,
+                          data: Dict[str, Any]) -> None:
+    """
+    Set up time window constraints for the routing model.
+    
+    Args:
+        routing: The routing model.
+        manager: The routing index manager.
+        data: The problem data dictionary.
+    """
+    def time_callback(from_index: int, to_index: int) -> int:
+        """Returns the travel time between the two nodes."""
+        from_node = manager.IndexToNode(from_index)
+        to_node = manager.IndexToNode(to_index)
+        distance_km = data["distance_matrix"][from_node][to_node] / 1000.0
+        travel_time = distance_km / data["speed"] * 60.0  # Convert to minutes
+        # Add service time for the destination node (except for depots)
+        service_time = data["service_times"][to_node] if to_node not in data["depot_indices"] else 0
+        return int(travel_time + service_time)
+
+    transit_time_callback_index = routing.RegisterTransitCallback(time_callback)
+    
+    routing.AddDimension(
+        transit_time_callback_index,
+        ALLOWED_WAITING_TIME,  # allow waiting time
+        MAX_TIME_PER_VEHICLE,  # maximum time per vehicle
+        False,  # Don't force start cumul to zero
+        "Time"
+    )
+    
+    time_dimension = routing.GetDimensionOrDie("Time")
+    
+    # Add time window constraints for all locations
+    for location_idx, time_window in enumerate(data["time_windows"]):
+        index = manager.NodeToIndex(location_idx)
+        # Ensure time window values are valid
+        start_time = max(0, time_window[0])
+        end_time = max(start_time, time_window[1])
+        time_dimension.CumulVar(index).SetRange(start_time, end_time)
+    
+    # Instantiate route start and end times to produce feasible times
+    for i in range(data["num_vehicles"]):
+        routing.AddVariableMinimizedByFinalizer(
+            time_dimension.CumulVar(routing.Start(i)))
+        routing.AddVariableMinimizedByFinalizer(
+            time_dimension.CumulVar(routing.End(i)))
+
+
+def setup_search_parameters() -> pywrapcp.DefaultRoutingSearchParameters:
+    """
+    Set up the search parameters for the routing solver.
+    
+    Returns:
+        The configured search parameters.
+    """
     search_parameters = pywrapcp.DefaultRoutingSearchParameters()
     search_parameters.first_solution_strategy = (
-        routing_enums_pb2.FirstSolutionStrategy.AUTOMATIC
+        routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
     )
     search_parameters.local_search_metaheuristic = (
-        routing_enums_pb2.LocalSearchMetaheuristic.AUTOMATIC
+        routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
     )
-    search_parameters.time_limit.FromSeconds(10)
+    search_parameters.time_limit.FromSeconds(SOLVE_TIME_LIMIT_SECONDS)
+    return search_parameters
 
-    # Solve the problem.
+
+def solve_cvrptw_md(file_path: Optional[Path] = None,
+                    export_to_file: bool = False,
+                    output_path: Optional[str] = None) -> Optional[pywrapcp.Assignment]:
+    """
+    Solve the CVRPTW-MD problem.
+    
+    Args:
+        file_path: Path to the VRP data file. If None, uses default dataset.
+        export_to_file: Whether to export the solution to a text file.
+        output_path: Custom path for the exported file. If None, generates a default name.
+        
+    Returns:
+        The solution found by the solver, or None if no solution was found.
+    """
+    # Create the data model
+    data = create_data_model(file_path)
+    
+    # Create the routing index manager
+    manager = pywrapcp.RoutingIndexManager(
+        len(data["distance_matrix"]),
+        data["num_vehicles"],
+        data["starts"],
+        data["ends"]
+    )
+    
+    # Create the routing model
+    routing = pywrapcp.RoutingModel(manager)
+    
+    # Set up various constraints and callbacks
+    setup_distance_callback(routing, manager, data)
+    setup_capacity_constraints(routing, manager, data)
+    setup_time_constraints(routing, manager, data)
+    
+    # Set up search parameters
+    search_parameters = setup_search_parameters()
+    
+    # Solve the problem
     solution = routing.SolveWithParameters(search_parameters)
-
-    # Print solution on console.
+    
+    # Print solution if found
     if solution:
         print_solution(data, manager, routing, solution)
+        
+        # Export to file if requested
+        if export_to_file:
+            export_solution_to_file(data, manager, routing, solution, output_path)
+    else:
+        print("No solution found!")
+    
+    return solution
+
+
+def main() -> None:
+    """Main function to solve the CVRPTW-MD problem."""
+    # Solve with pretty printing and visualization
+    # Set export_to_file=True to save the solution to a text file
+    solve_cvrptw_md(export_to_file=False)
 
 
 if __name__ == "__main__":
