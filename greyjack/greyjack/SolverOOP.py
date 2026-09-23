@@ -1,306 +1,454 @@
-# greyjack/SolverOOP.py
+"""Parallel OO solver with supervised workers and cooperative shutdown."""
 
-import pickle
-import time
-import random
-import uuid
 import logging
-import zmq
+import pickle
 import sys
-import gc
-import multiprocessing
-from multiprocessing import Pipe
+import threading
+import time
+import uuid
 from copy import deepcopy
+from queue import Empty, Queue
 
+import multiprocess
+import zmq
 from pathos.multiprocessing import ProcessPool
 from pathos.threading import ThreadPool
 
+from greyjack.agents.base.GJSolution import GJSolution
 from greyjack.agents.base.LoggingLevel import LoggingLevel
 from greyjack.agents.base.ParallelizationBackend import ParallelizationBackend
-from greyjack.agents.base.GJSolution import GJSolution
+from greyjack.agents.base._lifecycle import (
+    POLL_SECONDS,
+    SHUTDOWN_GRACE_SECONDS,
+    initialize_process_worker,
+    queue_pipe,
+    run_agent,
+)
 from greyjack.agents.base.individuals.Individual import Individual
 
-current_platform = sys.platform
 
-class SolverOOP():
-
-    def __init__(self, domain_builder, cotwin_builder, agent,
-                 parallelization_backend=ParallelizationBackend.Multiprocessing, 
-                 logging_level=LoggingLevel.Info, 
-                 n_jobs=None, score_precision=None,
-                 available_ports=None, default_port="25000",
-                 initial_solution = None):
-        
-        """
-        On Linux platform solver needs 2 ports to bind.
-        On other platforms n_agents + 2.
-        All ports are binding to localhost.
-        If run multiple Dockers containers, multiple containers can bind the same ports of localhost (if built with default settings).
-        Look examples to verify it yourself (for example, nquuens Dockerfile, guide to build is inside file).
-        """
-        
+class SolverOOP:
+    def __init__(
+        self,
+        domain_builder,
+        cotwin_builder,
+        agent,
+        parallelization_backend=ParallelizationBackend.Multiprocessing,
+        logging_level=LoggingLevel.Info,
+        n_jobs=None,
+        score_precision=None,
+        available_ports=None,
+        default_port="25000",
+        initial_solution=None,
+    ):
+        """Linux uses two localhost ports; other platforms use n_jobs + two."""
         self.domain_builder = domain_builder
         self.cotwin_builder = cotwin_builder
         self.agent = agent
-        self.n_jobs = multiprocessing.cpu_count() // 2 if n_jobs is None else n_jobs
+        self.n_jobs = (
+            max(1, multiprocess.cpu_count() // 2) if n_jobs is None else n_jobs
+        )
+        if type(self.n_jobs) is not int or self.n_jobs < 1:
+            raise ValueError("n_jobs must be a positive integer")
         self.score_precision = score_precision
         self.logging_level = logging_level
         self.parallelization_backend = parallelization_backend
         self.available_ports = available_ports
         self.default_port = default_port
         self.initial_solution = initial_solution
+        self.is_agent_wins_from_comparing_with_global = (
+            agent.is_win_from_comparing_with_global
+        )
+        self.is_linux = "linux" in sys.platform
+        self.observers = []
+        self.is_running = False
+        self._solve_lock = threading.Lock()
+        self._stop_requested = threading.Event()
+        self._cancellation = None
+        self._events = None
+        self._pool = None
+        self._jobs = {}
+        self._workers = []
+        self._pipes = []
+        self._process_pipes = []
+        self.context = None
+        self.master_to_agents_subscriber_socket = None
+        self.master_to_agents_publisher_socket = None
+        self._logger_handler = None
+        self._logger_name = f"greyjack.solver.{uuid.uuid4().hex}"
+        self._reset_results()
+        self._build_logger()
 
+    def _reset_results(self):
         self.global_top_individual = None
         self.global_top_solution = None
         self.variable_names = None
         self.discrete_ids = None
         self.is_variables_info_received = False
-        self.is_agent_wins_from_comparing_with_global = agent.is_win_from_comparing_with_global
         self.agent_statuses = {}
-        self.observers = []
-        self.is_running = False  # Control flag for the solving process
+        self._finished_agents = set()
+        self._checked_jobs = set()
 
-        self.is_linux = True if "linux" in current_platform else False
-
-        self._build_logger()
-        self._init_master_pub_sub()
-        if self.is_linux:
-            self._init_master_solver_pipe()
-        else:
-            self._init_agents_available_addresses_and_ports()
-
-    
     def _build_logger(self):
-
         if self.logging_level is None:
             self.logging_level = LoggingLevel.Info
-        if self.logging_level not in [LoggingLevel.FreshOnly, LoggingLevel.Info, LoggingLevel.Warn]:
-            raise Exception("logging_level must be value of LoggingLevel enum from greyjack.agents.base module")
-        
-        self.logger = logging.getLogger("logger")
+        if self.logging_level not in (
+            LoggingLevel.FreshOnly,
+            LoggingLevel.Info,
+            LoggingLevel.Warn,
+        ):
+            raise ValueError("logging_level must be a LoggingLevel value")
+        self.logger = logging.getLogger(self._logger_name)
         self.logger.setLevel(logging.INFO)
-        formatter = logging.Formatter('%(asctime)s, %(levelname)s: %(message)s', datefmt="%Y/%m/%d %H:%M:%S")
-        handler = logging.StreamHandler()
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
-        pass
+        self.logger.propagate = False
+        if self._logger_handler is None:
+            self._logger_handler = logging.StreamHandler()
+            self._logger_handler.setFormatter(
+                logging.Formatter(
+                    "%(asctime)s, %(levelname)s: %(message)s",
+                    datefmt="%Y/%m/%d %H:%M:%S",
+                )
+            )
+            self.logger.addHandler(self._logger_handler)
 
     def _init_master_pub_sub(self):
-
-        minimal_ports_count_required = 2
-        if self.available_ports is not None:
-            available_ports_count = len(self.available_ports)
-            if available_ports_count < minimal_ports_count_required:
-                exception_string = "Required at least {} available ports for master node to share global state between agents. Set available_ports list manually or set it None for auto allocation".format(self.n_jobs, minimal_ports_count_required)
-                raise Exception(exception_string)
-        else:
-            if not self.is_linux:
-                minimal_ports_count_required += self.n_jobs
-            self.available_ports = [str(int(self.default_port) + i) for i in range(minimal_ports_count_required)]
-        
+        required = 2 if self.is_linux else self.n_jobs + 2
+        if self.available_ports is None:
+            self.available_ports = [
+                str(int(self.default_port) + i) for i in range(required)
+            ]
+        if len(self.available_ports) < required:
+            raise ValueError(f"At least {required} available ports are required")
         self.address = "localhost"
-        self.master_subscriber_address = "tcp://{}:{}".format(self.address, self.available_ports[0])
+        self.master_subscriber_address = (
+            f"tcp://{self.address}:{self.available_ports[0]}"
+        )
+        self.master_publisher_address = (
+            f"tcp://{self.address}:{self.available_ports[1]}"
+        )
         self.context = zmq.Context()
         self.master_to_agents_subscriber_socket = self.context.socket(zmq.SUB)
+        self.master_to_agents_subscriber_socket.setsockopt(zmq.LINGER, 0)
         self.master_to_agents_subscriber_socket.setsockopt_string(zmq.SUBSCRIBE, "")
         self.master_to_agents_subscriber_socket.setsockopt(zmq.CONFLATE, 1)
-        self.master_to_agents_subscriber_socket.bind( self.master_subscriber_address )
-
-        self.master_publisher_address = "tcp://{}:{}".format(self.address, self.available_ports[1])
+        self.master_to_agents_subscriber_socket.bind(self.master_subscriber_address)
         self.master_to_agents_publisher_socket = self.context.socket(zmq.PUB)
-        self.master_to_agents_publisher_socket.bind( self.master_publisher_address )
-
-    def _init_agents_available_addresses_and_ports(self):
-
-        minimal_ports_count_required = self.n_jobs + 2
-        if self.available_ports is not None:
-            available_ports_count = len(self.available_ports)
-            if available_ports_count < minimal_ports_count_required:
-                exception_string = "For {} agents required at least {} available ports. Set available_ports list manually or set it None for auto allocation".format(self.n_jobs, minimal_ports_count_required)
-                raise Exception(exception_string)
-        else:
-            self.available_ports = [str(int(self.default_port) + i) for i in range(minimal_ports_count_required)]
-
-        current_port_id = 2
-        available_agent_to_agent_ports = [self.available_ports[current_port_id + i] for i in range(self.n_jobs)]
-        self.available_agent_to_agent_ports = available_agent_to_agent_ports
-        self.available_agent_to_agent_addresses = ["localhost" for i in range(self.n_jobs)]
-        pass
-
-    def _init_master_solver_pipe(self):
-        agent_to_master_updates_sender, master_from_agent_updates_receiver = Pipe()
-        self.agent_to_master_updates_sender = agent_to_master_updates_sender
-        self.master_from_agent_updates_receiver = master_from_agent_updates_receiver
-        master_to_agent_updates_sender, agent_from_master_updates_receiver = Pipe()
-        self.master_to_agent_updates_sender = master_to_agent_updates_sender
-        self.agent_from_master_updates_receiver = agent_from_master_updates_receiver
+        self.master_to_agents_publisher_socket.setsockopt(zmq.LINGER, 0)
+        self.master_to_agents_publisher_socket.bind(self.master_publisher_address)
+        if not self.is_linux:
+            self.available_agent_to_agent_ports = self.available_ports[2:required]
 
     def stop(self):
-        """
-        Signals the solver to stop the running solving process gracefully.
-        """
+        """Request cancellation; the solve thread owns all socket operations."""
         if self.is_running:
-            self.logger.info("Stop signal received. Terminating solver...")
-            self.is_running = False
+            self._stop_requested.set()
+            cancellation = self._cancellation
+            if cancellation is not None:
+                cancellation.set()
 
     def solve(self):
+        if not self._solve_lock.acquire(blocking=False):
+            raise RuntimeError("This solver is already running")
+        self._stop_requested.clear()
         self.is_running = True
-        agents = self._setup_agents()
-        agents_process_pool = self._run_jobs(agents)
-
-        start_time = time.perf_counter()
-        steps_count = 0
-        
-        poller = zmq.Poller()
-        poller.register(self.master_to_agents_subscriber_socket, zmq.POLLIN)
-
-        while self.is_running:
-            # Poll with a 100ms timeout to allow checking the is_running flag
-            sockets = dict(poller.poll(100))
-            
-            if self.master_to_agents_subscriber_socket in sockets and sockets[self.master_to_agents_subscriber_socket] == zmq.POLLIN:
-                received_individual, agent_id, agent_status, local_step = self.receive_agent_publication()
-                
-                new_best_flag = False
-                if self.global_top_individual is None:
-                    self.global_top_individual = received_individual
-                    self.update_global_top_solution()
-                    new_best_flag = True
-                elif received_individual < self.global_top_individual:
-                    self.global_top_individual = received_individual
-                    self.update_global_top_solution()
-                    new_best_flag = True
-                
+        self._reset_results()
+        self._started_at = time.perf_counter()
+        try:
+            self._build_logger()
+            if self.parallelization_backend == ParallelizationBackend.Multiprocessing:
+                self._process_context = multiprocess.get_context("spawn")
+                self._cancellation = self._process_context.Event()
+                # Synchronous writes preserve final data without a feeder thread
+                # or closing a process-global queue after each agent task.
+                self._events = self._process_context.SimpleQueue()
+            elif self.parallelization_backend == ParallelizationBackend.Threading:
+                self._cancellation = threading.Event()
+                self._events = Queue()
+            else:
+                raise ValueError(
+                    "parallelization_backend must be a ParallelizationBackend value"
+                )
+            if self._stop_requested.is_set():
+                self._cancellation.set()
+            self._init_master_pub_sub()
+            agents = self._setup_agents()
+            if not self._cancellation.is_set():
+                self._run_jobs(agents)
+            while not self._cancellation.is_set():
+                # Supervision is independent of score publications, including startup.
+                self._check_jobs()
+                self._drain_events()
+                if len(self._finished_agents) == self.n_jobs:
+                    self._cancellation.set()
+                    break
+                if self.master_to_agents_subscriber_socket.poll(
+                    int(POLL_SECONDS * 1000)
+                ):
+                    publication = pickle.loads(
+                        self.master_to_agents_subscriber_socket.recv()
+                    )
+                    self._accept_publication(publication)
+                # Retry the latest state even if an early PUB reply was dropped.
                 self.send_global_update(is_end=False)
-
-                total_time = time.perf_counter() - start_time
-                steps_count += 1
-                new_best_string = "New best score!" if new_best_flag else ""
-                if self.logging_level == LoggingLevel.FreshOnly and new_best_flag:
-                    self.logger.info(f"Agent: {agent_id:4} Step {local_step} Best score: {self.global_top_individual.score}, Solving time: {total_time:.6f} {new_best_string}")
-
-                if len(self.observers) >= 1:
-                    self._notify_observers()
-
-                self.agent_statuses[agent_id] = agent_status
-                if "alive" not in self.agent_statuses.values():
-                    self.logger.info("All agents have terminated naturally.")
-                    self.is_running = False
-
-        # --- Loop has ended, begin cleanup ---
-        self.logger.info("Solver loop finished. Cleaning up resources.")
-        self.send_global_update(is_end=True)
-        time.sleep(0.5)
-
-        agents_process_pool.terminate()
-        agents_process_pool.join()
-        agents_process_pool.close()
-        del agents_process_pool
-        
-        self.master_to_agents_publisher_socket.close()
-        self.master_to_agents_subscriber_socket.close()
-        self.context.term()
-
-        del self.context
-        del self.master_to_agents_publisher_socket
-        del self.master_to_agents_subscriber_socket
-
-        gc.collect()
-        return self.global_top_solution     
+        finally:
+            original_error = sys.exc_info()[1]
+            try:
+                self._shutdown()
+            except BaseException:
+                if original_error is None:
+                    raise
+                self.logger.warning("Cleanup also failed", exc_info=True)
+            finally:
+                self.is_running = False
+                self._solve_lock.release()
+        return self.global_top_solution
 
     def _run_jobs(self, agents):
-        def run_agent_solving(agent):
-            agent.solve()
-
         pool_name = str(uuid.uuid4())
         if self.parallelization_backend == ParallelizationBackend.Threading:
-            agents_process_pool = ThreadPool(id=pool_name)
-        elif self.parallelization_backend == ParallelizationBackend.Multiprocessing:
-            agents_process_pool = ProcessPool(id=pool_name)
+            self._pool = ThreadPool(nodes=self.n_jobs, id=pool_name)
         else:
-            raise Exception("parallelization_backend must be value of enum ParallelizationBackend from greyjack.agents.base module")
-        agents_process_pool.ncpus = self.n_jobs
-        agents_process_pool.imap(run_agent_solving, agents)
-        return agents_process_pool
+            self._pool = ProcessPool(
+                nodes=self.n_jobs,
+                id=pool_name,
+                context=self._process_context,
+                initializer=initialize_process_worker,
+                initargs=(self._cancellation, self._events, self._process_pipes),
+            )
+            # Keep original Process objects: a pool may silently replace a crashed
+            # native worker while its submitted job remains permanently unfinished.
+            self._workers = list(self._pool._serve()._pool)
+        for agent in agents:
+            if self.parallelization_backend == ParallelizationBackend.Threading:
+                job = self._pool.apipe(
+                    run_agent, agent, self._cancellation, self._events
+                )
+            else:
+                job = self._pool.apipe(run_agent, agent)
+            self._jobs[agent.agent_id] = job
+        return self._pool
+
+    def _check_jobs(self, check_health=True):
+        for agent_id, job in self._jobs.items():
+            if agent_id not in self._checked_jobs and job.ready():
+                self._checked_jobs.add(agent_id)
+                try:
+                    job.get(timeout=0)
+                except Exception as error:
+                    raise RuntimeError(f"Agent {agent_id} failed: {error}") from error
+        if check_health:
+            for worker in self._workers:
+                if worker.exitcode is not None:
+                    raise RuntimeError(
+                        f"Solver worker PID {worker.pid} exited unexpectedly "
+                        f"with exit code {worker.exitcode}"
+                    )
 
     def _setup_agents(self):
-        
-        agents = [deepcopy(self.agent) for i in range(self.n_jobs)]
-        for i in range(self.n_jobs):
-            agents[i].agent_id = str(i)
-            agents[i].domain_builder = deepcopy(self.domain_builder)
-            agents[i].cotwin_builder = deepcopy(self.cotwin_builder)
-            agents[i].initial_solution = deepcopy(self.initial_solution)
-            agents[i].score_precision = deepcopy(self.score_precision)
-            agents[i].logging_level = deepcopy(self.logging_level)
-            agents[i].total_agents_count = self.n_jobs
+        agents = [deepcopy(self.agent) for _ in range(self.n_jobs)]
+        for i, agent in enumerate(agents):
+            agent.agent_id = str(i)
+            agent.domain_builder = deepcopy(self.domain_builder)
+            agent.cotwin_builder = deepcopy(self.cotwin_builder)
+            agent.initial_solution = deepcopy(self.initial_solution)
+            agent.score_precision = deepcopy(self.score_precision)
+            agent.logging_level = self.logging_level
+            agent.total_agents_count = self.n_jobs
+            agent.master_subscriber_address = self.master_subscriber_address
+            agent.master_publisher_address = self.master_publisher_address
             self.agent_statuses[str(i)] = "alive"
-
-        for i in range(self.n_jobs):
-            for j in range(self.n_jobs):
-                agents[i].round_robin_status_dict[agents[j].agent_id] = deepcopy(agents[i].agent_status)
-
-        for i in range(self.n_jobs):
-            agents[i].master_subscriber_address = deepcopy(self.master_subscriber_address)
-            agents[i].master_publisher_address = deepcopy(self.master_publisher_address)
-
+            agent.round_robin_status_dict = {
+                str(j): "alive" for j in range(self.n_jobs)
+            }
         if self.is_linux:
-            agents_updates_senders = []
-            agents_updates_receivers = []
-            for i in range(self.n_jobs):
-                agent_to_agent_pipe_sender, agent_to_agent_pipe_receiver = Pipe()
-                agents_updates_senders.append(agent_to_agent_pipe_sender)
-                agents_updates_receivers.append(agent_to_agent_pipe_receiver)
-            agents_updates_receivers.append(agents_updates_receivers.pop(0))
-            for i in range(self.n_jobs):
-                agents[i].agent_to_agent_pipe_sender = agents_updates_senders[i]
-                agents[i].agent_to_agent_pipe_receiver = agents_updates_receivers[i]
+            senders, receivers = [], []
+            for _ in agents:
+                if self.parallelization_backend == ParallelizationBackend.Threading:
+                    sender, receiver = queue_pipe(self._cancellation)
+                else:
+                    sender, receiver = self._process_context.Pipe()
+                self._pipes.extend((sender, receiver))
+                senders.append(sender)
+                receivers.append(receiver)
+            receivers.append(receivers.pop(0))
+            for agent, sender, receiver in zip(agents, senders, receivers):
+                if self.parallelization_backend == ParallelizationBackend.Threading:
+                    agent.agent_to_agent_pipe_sender = sender
+                    agent.agent_to_agent_pipe_receiver = receiver
+                else:
+                    # Transfer through spawn, not task serialization, avoiding a
+                    # persistent global resource-sharer thread for file descriptors.
+                    self._process_pipes.append((sender, receiver))
         else:
-            for i in range(self.n_jobs):
-                agents[i].agent_address_for_other_agents = deepcopy("tcp://{}:{}".format(self.available_agent_to_agent_addresses[i], self.available_agent_to_agent_ports[i]))
-            for i in range(self.n_jobs):
-                next_agent_id = (i + 1) % self.n_jobs
-                agents[i].next_agent_address = deepcopy(agents[next_agent_id].agent_address_for_other_agents)
+            for i, agent in enumerate(agents):
+                agent.agent_address_for_other_agents = (
+                    f"tcp://localhost:{self.available_agent_to_agent_ports[i]}"
+                )
+            for i, agent in enumerate(agents):
+                agent.next_agent_address = agents[
+                    (i + 1) % self.n_jobs
+                ].agent_address_for_other_agents
         return agents
 
-    def receive_agent_publication(self):
+    def _drain_events(self, notify=True):
+        if self._events is None:
+            return
+        while True:
+            try:
+                if hasattr(self._events, "get_nowait"):
+                    payload = self._events.get_nowait()
+                else:
+                    if not self._events._reader.poll():
+                        return
+                    payload = self._events.get()
+                event = pickle.loads(payload)
+            except Empty:
+                return
+            if event["kind"] in ("finished", "returned"):
+                self._finished_agents.add(event["agent_id"])
+                self.agent_statuses[event["agent_id"]] = "dead"
+            if event.get("publication") is not None:
+                self._accept_publication(event["publication"], notify=notify)
 
-        agent_publication = self.master_to_agents_subscriber_socket.recv()
-        agent_publication = pickle.loads(agent_publication)
-        agent_id = agent_publication["agent_id"]
-        agent_status = agent_publication["status"]
-        local_step = agent_publication["step"]
-        score_variant = agent_publication["score_variant"]
-        received_individual = agent_publication["candidate"]
-        received_individual = Individual.get_related_individual_type_by_value(score_variant).from_list(received_individual)
-        if not self.is_variables_info_received:
-            self.variable_names = agent_publication["variable_names"]
-            self.discrete_ids = agent_publication["discrete_ids"]
+    def _decode_publication(self, publication):
+        if publication.get("variable_names") is not None:
+            self.variable_names = publication["variable_names"]
+            self.discrete_ids = publication["discrete_ids"]
             self.is_variables_info_received = True
+        individual = Individual.get_related_individual_type_by_value(
+            publication["score_variant"]
+        ).from_list(publication["candidate"])
+        return (
+            individual,
+            publication["agent_id"],
+            publication["status"],
+            publication["step"],
+        )
 
-        return received_individual, agent_id, agent_status, local_step
+    def receive_agent_publication(self):
+        return self._decode_publication(
+            pickle.loads(self.master_to_agents_subscriber_socket.recv())
+        )
+
+    def _accept_publication(self, publication, notify=True):
+        individual, agent_id, status, step = self._decode_publication(publication)
+        improved = (
+            self.global_top_individual is None
+            or individual < self.global_top_individual
+        )
+        if improved:
+            self.global_top_individual = individual
+            self.update_global_top_solution()
+            if notify and self.logging_level == LoggingLevel.FreshOnly:
+                self.logger.info(
+                    "Agent: %4s Step %s Best score: %s, Solving time: %.6f New best score!",
+                    agent_id,
+                    step,
+                    individual.score,
+                    time.perf_counter() - self._started_at,
+                )
+        # Conflated score messages must never undo reliable final state.
+        if agent_id not in self._finished_agents:
+            self.agent_statuses[agent_id] = status
+        if notify and self.observers:
+            self._notify_observers()
 
     def send_global_update(self, is_end):
+        if self.master_to_agents_publisher_socket is None:
+            return
+        candidate = None
+        if (
+            self.is_agent_wins_from_comparing_with_global
+            and self.global_top_individual is not None
+        ):
+            candidate = self.global_top_individual.as_list()
+        try:
+            self.master_to_agents_publisher_socket.send(
+                pickle.dumps([candidate, self.is_variables_info_received, is_end]),
+                flags=zmq.NOBLOCK,
+            )
+        except zmq.Again:
+            pass
 
-        if self.is_agent_wins_from_comparing_with_global and self.global_top_individual is not None:
-            master_publication = [self.global_top_individual.as_list(), self.is_variables_info_received, is_end]
-        else:
-            master_publication = [None, self.is_variables_info_received, is_end]
-
-        master_publication = pickle.dumps(master_publication)
-        self.master_to_agents_publisher_socket.send( master_publication )
+    def _shutdown(self):
+        """Drain reliable final data while workers leave cancellable waits."""
+        cleanup_error = None
+        forced = False
+        if self._cancellation is not None:
+            self._cancellation.set()
+        deadline = time.monotonic() + SHUTDOWN_GRACE_SECONDS
+        try:
+            if self._pool is not None:
+                while True:
+                    self.send_global_update(is_end=True)
+                    self._drain_events(notify=False)
+                    try:
+                        self._check_jobs(check_health=False)
+                    except Exception as error:
+                        if cleanup_error is None:
+                            cleanup_error = error
+                    if all(job.ready() for job in self._jobs.values()):
+                        break
+                    if (
+                        self.parallelization_backend
+                        == ParallelizationBackend.Multiprocessing
+                        and time.monotonic() >= deadline
+                    ):
+                        forced = True
+                        self._pool.terminate()
+                        break
+                    # Threads cannot safely interrupt arbitrary user/native code.
+                    # Owned communication waits all check cancellation promptly.
+                    time.sleep(POLL_SECONDS)
+                if not forced:
+                    self._drain_events(notify=False)
+                    self._pool.close()
+                self._pool.join()
+                self._pool.clear()
+        finally:
+            self._pool = None
+            self._jobs = {}
+            self._workers = []
+            for pipe in self._pipes:
+                pipe.close()
+            self._pipes = []
+            self._process_pipes = []
+            for name in (
+                "master_to_agents_subscriber_socket",
+                "master_to_agents_publisher_socket",
+            ):
+                socket = getattr(self, name)
+                if socket is not None:
+                    socket.close(linger=0)
+                    setattr(self, name, None)
+            if self.context is not None:
+                self.context.term()
+                self.context = None
+            if self._events is not None and hasattr(self._events, "close"):
+                self._events.close()
+            self._events = None
+            self._cancellation = None
+            if self._logger_handler is not None:
+                self.logger.removeHandler(self._logger_handler)
+                self._logger_handler.close()
+                self._logger_handler = None
+        if cleanup_error is not None:
+            raise cleanup_error
 
     def update_global_top_solution(self):
-        if self.global_top_individual and self.variable_names:
-            individual_list = self.global_top_individual.as_list()
-            self.global_top_solution = GJSolution(self.variable_names, self.discrete_ids, individual_list[0], individual_list[1], self.score_precision)
-        pass
-    
+        if self.global_top_individual is not None and self.variable_names is not None:
+            values, score = self.global_top_individual.as_list()
+            self.global_top_solution = GJSolution(
+                self.variable_names,
+                self.discrete_ids,
+                values,
+                score,
+                self.score_precision,
+            )
+
     def register_observer(self, observer):
         self.observers.append(observer)
-        pass
 
     def _notify_observers(self):
         for observer in self.observers:
             observer.update_solution(self.global_top_solution)
-        pass

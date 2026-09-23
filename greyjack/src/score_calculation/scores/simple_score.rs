@@ -7,7 +7,7 @@ use std::cmp::Ordering;
 use std::ops::{Add, AddAssign};
 use std::fmt::{Display, Formatter};
 
-#[pyclass(str, eq, ord)]
+#[pyclass(from_py_object, str, eq, ord)]
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct SimpleScore {
     pub simple_value: f64

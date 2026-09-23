@@ -15,7 +15,7 @@ use rand_distr::{Distribution, Uniform};
 
 use super::VariablesManager;
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct VariablesManagerPy {
     pub variables_vec: Vec<GJPlanningVariable>,

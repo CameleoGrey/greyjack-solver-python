@@ -3,7 +3,7 @@
 macro_rules! build_concrete_individual {
     ($name: ident, $score_type: ident) => {
 
-            #[pyclass(str, eq, ord)]
+            #[pyclass(from_py_object, str, eq, ord)]
             #[derive(Debug, Clone)]
             pub struct $name {
                 pub variable_values: Vec<f64>,

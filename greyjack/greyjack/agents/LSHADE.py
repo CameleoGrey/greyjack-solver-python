@@ -21,7 +21,7 @@ class LSHADE(Agent):
         self, population_size=128, history_archive_size=100, 
         p_best_rate=0.2, tabu_entity_rate=0.2, 
         mutation_rate_multiplier=1.0, move_probas=None,
-        memory_pruning_rate=0.0, guarantee_of_change_size=1.0, 
+        memory_pruning_rate=0.0, guarantee_of_change_size=1,
         initial_f=0.5, initial_cr=0.02, initial_mutation_proba=0.5,
         migration_rate=0.00001, migration_frequency=10, termination_strategy=None
     ):

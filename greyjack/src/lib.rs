@@ -54,7 +54,7 @@ build_concrete_sum_scores_function!(sum_hard_soft_scores, HardSoftScore);
 build_concrete_sum_scores_function!(sum_hard_medium_soft_scores, HardMediumSoftScore);
 
 
-#[pymodule]
+#[pymodule(gil_used = true)]
 fn greyjack(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
 
     // greyjack.variables

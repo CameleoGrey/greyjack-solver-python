@@ -1,8 +1,6 @@
 
 
 import numpy as np
-import random
-import traceback
 from datetime import datetime
 from greyjack.persistence.CotwinBuilderBase import CotwinBuilderBase
 from greyjack.variables.GJInteger import GJInteger
@@ -23,24 +21,20 @@ class CotwinBuilder(CotwinBuilderBase):
 
         cotwin = Cotwin()
 
-        try:
+        planning_shifts = self._build_planning_shifts(domain, is_already_initialized)
+        problem_fact_employees = self._build_problem_fact_employees(domain)
 
-            planning_shifts = self._build_planning_shifts(domain, is_already_initialized)
-            problem_fact_employees = self._build_problem_fact_employees(domain)
+        if self.use_incremental_score_calculator:
+            score_calculator = IncrementalScoreCalculator()
+            self._add_utility_info_for_incremental_scoring(cotwin, score_calculator, planning_shifts, problem_fact_employees)
+            self._remove_redundant_fields(planning_shifts)
+            cotwin.add_planning_entities_list(planning_shifts, "shifts")
+        else:
+            score_calculator = PlainScoreCalculator()
+            cotwin.add_planning_entities_list(planning_shifts, "shifts")
+            cotwin.add_problem_facts_list(problem_fact_employees, "employees")
 
-            if self.use_incremental_score_calculator:
-                score_calculator = IncrementalScoreCalculator()
-                self._add_utility_info_for_incremental_scoring(cotwin, score_calculator, planning_shifts, problem_fact_employees)
-                self._remove_redundant_fields(planning_shifts)
-                cotwin.add_planning_entities_list(planning_shifts, "shifts")
-            else:
-                score_calculator = PlainScoreCalculator()
-                cotwin.add_planning_entities_list(planning_shifts, "shifts")
-                cotwin.add_problem_facts_list(problem_fact_employees, "employees")
-
-            cotwin.set_score_calculator( score_calculator )
-        except Exception as e:
-            print(traceback.format_exc())
+        cotwin.set_score_calculator( score_calculator )
 
         return cotwin
     
@@ -79,8 +73,8 @@ class CotwinBuilder(CotwinBuilderBase):
             shift_start_dates[i] = int(datetime.combine(planning_shifts[i].start_date, datetime.min.time()).timestamp() // 60)
             shift_req_skills[i] = skills_to_int_map[planning_shifts[i].required_skill]
         score_calculator.utility_objects["shift_starts"] = shift_starts.tolist()
-        score_calculator.utility_objects["shift_ends"] = shift_starts.tolist()
-        score_calculator.utility_objects["shift_start_dates"] = shift_starts.tolist()
+        score_calculator.utility_objects["shift_ends"] = shift_ends.tolist()
+        score_calculator.utility_objects["shift_start_dates"] = shift_start_dates.tolist()
         score_calculator.utility_objects["shift_req_skills"] = shift_req_skills.tolist()
         
         m_employees = len(problem_fact_employees)
@@ -157,7 +151,6 @@ class CotwinBuilder(CotwinBuilderBase):
             )
         
         return problem_fact_employees
-
 
 
 

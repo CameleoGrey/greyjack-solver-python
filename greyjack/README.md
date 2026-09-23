@@ -33,15 +33,84 @@ pip install greyjack
 - Explore, try examples. Docs and guides will be later. GreyJack is very intuitively understandable solver (even Rust version).
 - Use examples as reference for solving your tasks.
 
-# Install GreyJack Solver from source
+# Supported runtime and native compatibility
 
-- Be sure that you've installed Rust (rustup) and Python on your machine.
+GreyJack 0.3.9 requires Python 3.10 or newer. The Python/native compatibility
+cohort is Python Polars `>=1.44.2,<1.45`, Rust Polars `0.55.2`,
+`pyo3-polars 0.28.0`, and PyO3 `0.29.2`. These components cross the native
+DataFrame boundary together; upgrading Python Polars beyond this range requires
+a matching native rebuild and interoperability checks.
+
+Source builds require Rust 1.95 or newer. The repository toolchain is pinned to
+1.98.1 in `rust-toolchain.toml`; rustup selects it when building this checkout.
+CI builds and tests installed wheels on Linux, Windows, and macOS with Python
+3.12, plus Linux with Python 3.10, using Polars 1.44.2. The tests run outside the
+checkout and verify the installed package path so local sources cannot conceal
+a broken wheel. Workflow configuration describes the checks; successful remote
+runs provide the evidence that those checks passed.
+
+CI limits build memory for hosted runners with as little as 7 GB RAM by using
+ThinLTO, 16 codegen units, no debug information, and two build jobs. These
+workflow-only overrides retain release optimization level 3; local Cargo release
+settings are unchanged.
+
+# Develop GreyJack and run examples locally
+
+Install rustup, the pinned Rust toolchain, Python, and uv. From the repository
+root:
+
+```bash
+uv sync --project examples --group dev
+uv run --project examples --group dev python -m pytest greyjack/tests
+uv run --project examples python -m examples.object_oriented.employee_scheduling.scripts.solve_task
 ```
-- (create venv, activate it, cd greyjack-solver-python/greyjack)
-pip install maturin
-maturin develop --release
+
+The examples project declares `greyjack` as an editable dependency at
+`../greyjack`, so Python source edits apply to the next process. To rebuild the
+native extension after Rust or Cargo changes:
+
+```bash
+uv sync --project examples --group dev --reinstall-package greyjack
 ```
--  maturin will build the Rust part, get all Python dependencies (for solver itself, not examples) and install greyjack to your venv
+
+Restart running interpreters after rebuilding the native library. An editable
+Python installation does not hot-reload Rust code; see
+[uv's local dependency cache behavior](https://docs.astral.sh/uv/concepts/cache/).
+The first build compiles the native dependency stack and can take time.
+
+For a separate, activated virtual environment, a direct source installation is
+also available from the repository root:
+
+```bash
+python -m pip install maturin
+python -m maturin develop --release --manifest-path greyjack/Cargo.toml
+```
+
+# Solver lifecycle
+
+Agent failures surface as `RuntimeError` in the caller, carrying worker error
+details. A failed solve does not silently return a partial success. A normal
+stop returns the best available solution, or `None` if no candidate was produced.
+`KeyboardInterrupt` requests cleanup and is re-raised so the caller retains
+control of Ctrl-C handling.
+
+Process-based solving uses spawn-safe startup. Put solver execution under a
+`if __name__ == "__main__":` guard and keep worker-callable code importable.
+For example:
+
+```python
+def main():
+    # Construct and run your solver here.
+    pass
+
+
+if __name__ == "__main__":
+    main()
+```
+
+Thread callbacks stop cooperatively. A callback that blocks indefinitely cannot
+be forcibly interrupted safely; callbacks should finish or observe application
+cancellation so solver cleanup can complete.
 
 # RoadMap
 - Types, arguments validation

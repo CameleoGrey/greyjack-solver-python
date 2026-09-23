@@ -75,8 +75,11 @@ impl CandidateDfsBuilder {
 
             for df_name in group_data_map.keys() {
                 let mut current_df = self.planning_entity_dfs[df_name].clone();
-                let needful_rows_count  = samples_count * self.raw_dfs[df_name].size();
-                if current_df.size() != needful_rows_count {
+                let needful_rows_count  = samples_count * self.raw_dfs[df_name].height();
+                // An incremental request adds a row-index column. Reset that
+                // derived schema as well as the height before the next request.
+                if current_df.height() != needful_rows_count
+                    || current_df.width() != self.raw_dfs[df_name].width() {
                     let mut new_df_parts: Vec<LazyFrame> = Vec::new();
                     for i in 0..samples_count {
                         new_df_parts.push(self.raw_dfs[df_name].clone().lazy());
@@ -98,7 +101,7 @@ impl CandidateDfsBuilder {
                     }
 
 
-                    current_df.with_column(updated_column).unwrap();
+                    current_df.with_column(updated_column.into()).unwrap();
                 }
                 current_df.rechunk_mut();
 
@@ -299,7 +302,7 @@ impl CandidateDfsBuilder {
                     }
 
 
-                    current_df.with_column(updated_column).unwrap();
+                    current_df.with_column(updated_column.into()).unwrap();
                 });
                 current_df = current_df.sort(["sample_id", "candidate_df_row_id"], SortMultipleOptions::default()).unwrap();
 
