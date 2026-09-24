@@ -1,6 +1,3 @@
-
-
-
 #[macro_export]
 macro_rules! build_concrete_simulated_annealing_base {
     ($me_base_name: ident, $individual_variant: ident, $score_type: ty) => {
@@ -40,21 +37,17 @@ macro_rules! build_concrete_simulated_annealing_base {
                 mutation_rate_multiplier: Option<f64>,
                 move_probas: Option<Vec<f64>>,
                 discrete_ids: Option<Vec<usize>>,
-            ) -> Self {
+            ) -> PyResult<Self> {
 
-                let current_mutation_rate_multiplier;
-                match mutation_rate_multiplier {
-                    Some(x) => current_mutation_rate_multiplier = mutation_rate_multiplier.unwrap(),
-                    None => current_mutation_rate_multiplier = 0.0,
-                }
-                let mut group_mutation_rates_map: HashMap<String, f64> = HashMap::default();
-                for group_name in semantic_groups_dict.keys() {
-                    let group_size = semantic_groups_dict[group_name].len();
-                    let current_group_mutation_rate = current_mutation_rate_multiplier * (1.0 / (group_size as f64));
-                    group_mutation_rates_map.insert(group_name.clone(), current_group_mutation_rate);
-                }
+                // The validated variables own semantic groups; the legacy group
+                // argument remains accepted for Python call compatibility.
+                let variables_manager = VariablesManager::new(variables_manager_py.variables_vec.clone());
+                let mover = Mover::new(tabu_entity_rate, mutation_rate_multiplier, move_probas, &variables_manager)
+                    .map_err(pyo3::exceptions::PyValueError::new_err)?;
+                let group_mutation_rates_map = mover.group_mutation_rates_map.clone();
+                let current_mutation_rate_multiplier = mutation_rate_multiplier.unwrap_or(0.0);
 
-                Self {
+                Ok(Self {
                     initial_temperature: initial_temperature.clone(),
                     cooling_rate: cooling_rate,
                     tabu_entity_rate: tabu_entity_rate,
@@ -64,72 +57,52 @@ macro_rules! build_concrete_simulated_annealing_base {
 
                     group_mutation_rates_map: group_mutation_rates_map.clone(),
                     discrete_ids: discrete_ids.clone(),
-                    mover: Mover::new(tabu_entity_rate, HashMap::default(), HashMap::default(), HashMap::default(), group_mutation_rates_map.clone(), move_probas),
-                    variables_manager: VariablesManager::new(variables_manager_py.variables_vec.clone()),
+                    mover,
+                    variables_manager,
                     current_temperature: initial_temperature,
                     inverted_accomplish_rate: 1.0,
                     random_sampler: Uniform::new_inclusive(0.0, 1.0),
                     random_generator: StdRng::from_entropy(),
                     exp: 2.7182818284590452
-                }
+                })
             }
 
             fn sample_candidates_plain(
-                    &mut self, 
-                    population: Vec<$individual_variant>, 
-                    current_top_individual: $individual_variant,
-                ) -> Vec<Vec<f64>> {
-
-                if self.mover.tabu_entity_size_map.len() == 0 {
-                    let semantic_groups_map = &self.variables_manager.semantic_groups_map.clone();
-                    for (group_name, group_ids) in semantic_groups_map {
-                        self.mover.tabu_ids_sets_map.insert(group_name.clone(), HashSet::default());
-                        self.mover.tabu_entity_size_map.insert(group_name.clone(), max((self.tabu_entity_rate * (group_ids.len() as f64)).ceil() as usize, 1));
-                        self.mover.tabu_ids_vecdeque_map.insert(group_name.clone(), VecDeque::new());
-                    }
-                }
-
-                let mut candidate = population[0].variable_values.clone();
-                let (changed_candidate, changed_columns, candidate_deltas) = self.mover.do_move(&mut candidate, &self.variables_manager, false);
-                candidate = changed_candidate.unwrap();
-                self.variables_manager.fix_variables(&mut candidate, changed_columns);
-                let candidate = vec![candidate; 1];
-
-                return candidate;
+                &mut self,
+                population: Vec<$individual_variant>,
+                current_top_individual: $individual_variant,
+            ) -> PyResult<Vec<Vec<f64>>> {
+                let candidate = &population.first()
+                    .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("Population must not be empty"))?
+                    .variable_values;
+                (0..1).map(|_| {
+                    self.mover.sample_plain(candidate, &self.variables_manager)
+                        .map_err(pyo3::exceptions::PyValueError::new_err)
+                }).collect()
             }
 
             fn sample_candidates_incremental(
                 &mut self,
-                population: Vec<$individual_variant>, 
+                population: Vec<$individual_variant>,
                 current_top_individual: $individual_variant,
-            ) -> (Vec<f64>, Vec<Vec<(usize, f64)>>) {
-
-                if self.mover.tabu_entity_size_map.len() == 0 {
-                    let semantic_groups_map = &self.variables_manager.semantic_groups_map.clone();
-                    for (group_name, group_ids) in semantic_groups_map {
-                        self.mover.tabu_ids_sets_map.insert(group_name.clone(), HashSet::default());
-                        self.mover.tabu_entity_size_map.insert(group_name.clone(), max((self.tabu_entity_rate * (group_ids.len() as f64)).ceil() as usize, 1));
-                        self.mover.tabu_ids_vecdeque_map.insert(group_name.clone(), VecDeque::new());
-                    }
-                }
-
-                let mut candidate = population[0].variable_values.clone();
-                let (_, changed_columns, candidate_deltas) = self.mover.do_move(&mut candidate, &self.variables_manager, true);
-                let mut candidate_deltas = candidate_deltas.unwrap();
-                self.variables_manager.fix_deltas(&mut candidate_deltas, changed_columns.clone());
-                let changed_columns = changed_columns.unwrap();
-                let candidate_deltas: Vec<(usize, f64)> = changed_columns.iter().zip(candidate_deltas.iter()).map(|(col_id, delta_value)| (*col_id, *delta_value)).collect();
-                let deltas = vec![candidate_deltas; 1];
-
-                return (candidate, deltas);
+            ) -> PyResult<(Vec<f64>, Vec<Vec<(usize, f64)>>)> {
+                let candidate = &population.first()
+                    .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("Population must not be empty"))?
+                    .variable_values;
+                let deltas = (0..1).map(|_| {
+                    self.mover.sample_delta(candidate, &self.variables_manager)
+                        .map(|delta| delta.into_pairs())
+                        .map_err(pyo3::exceptions::PyValueError::new_err)
+                }).collect::<PyResult<Vec<_>>>()?;
+                Ok((candidate.clone(), deltas))
             }
 
             fn build_updated_population(
-                &mut self, 
-                current_population: Vec<$individual_variant>, 
+                &mut self,
+                current_population: Vec<$individual_variant>,
                 candidates: Vec<$individual_variant>
                 ) -> Vec<$individual_variant> {
-                
+
                 self.current_temperature = self.current_temperature.iter().map(|ct| {
                     let mut new_temperature = *ct * self.cooling_rate;
                     if new_temperature < 0.000001 {
@@ -145,10 +118,10 @@ macro_rules! build_concrete_simulated_annealing_base {
                 .enumerate()
                 .map(|(i, (cur_e, can_e))| self.exp.powf(-((can_e - cur_e) / self.current_temperature[i])))
                 .collect();
-                
+
                 let accept_proba = accept_probas.iter().fold(1.0, |acc, x| acc * *x);
                 let random_value = self.random_sampler.sample(&mut self.random_generator);
-                
+
                 let new_population: Vec<$individual_variant>;
                 if (candidates[0].score <= current_population[0].score) || (random_value < accept_proba) {
                     new_population = candidates.clone();
@@ -161,13 +134,13 @@ macro_rules! build_concrete_simulated_annealing_base {
             }
 
             fn build_updated_population_incremental(
-                    &mut self, 
-                    current_population: Vec<$individual_variant>, 
+                    &mut self,
+                    current_population: Vec<$individual_variant>,
                     sample: Vec<f64>,
                     deltas: Vec<Vec<(usize, f64)>>,
                     scores: Vec<$score_type>,
                 ) -> (Vec<$individual_variant>, Option<Vec<(usize, f64)>>) {
-                
+
                 self.current_temperature = self.current_temperature.iter().map(|ct| {
                     let mut new_temperature = *ct * self.cooling_rate;
                     if new_temperature < 0.000001 {
@@ -175,7 +148,7 @@ macro_rules! build_concrete_simulated_annealing_base {
                     }
                     return new_temperature;
                 }).collect();
-                
+
 
                 let current_energy = current_population[0].score.as_list();
                 let candidate_energy = scores[0].as_list();
@@ -184,10 +157,10 @@ macro_rules! build_concrete_simulated_annealing_base {
                 .enumerate()
                 .map(|(i, (cur_e, can_e))| self.exp.powf(-((can_e - cur_e) / self.current_temperature[i])))
                 .collect();
-                
+
                 let accept_proba = accept_probas.iter().fold(1.0, |acc, x| acc * *x);
                 let random_value = self.random_sampler.sample(&mut self.random_generator);
-                
+
                 let mut sample = sample;
                 if (scores[0] <= current_population[0].score) || (random_value < accept_proba) {
                     let candidate_deltas = deltas[0].clone();
@@ -201,7 +174,7 @@ macro_rules! build_concrete_simulated_annealing_base {
                     (current_population.clone(), None)
                 }
             }
-            
+
             #[getter]
             fn get_metaheuristic_kind(&self) -> String {
                 self.metaheuristic_kind.clone()

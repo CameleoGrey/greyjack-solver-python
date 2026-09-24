@@ -1,17 +1,10 @@
-
-
+use pyo3::exceptions::{PyIndexError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::PyList;
-use pyo3::pycell::*;
 
-use crate::variables::{GJPlanningVariable, GJPlanningVariablePy};
-use polars::prelude::*;
-use rustc_hash::FxHashMap as HashMap;
 use crate::utils::rng_utils::RngUtils;
+use crate::variables::{GJPlanningVariable, GJPlanningVariablePy};
+use rustc_hash::FxHashMap as HashMap;
 
-use rand::SeedableRng;
-use rand::rngs::StdRng;
-use rand_distr::{Distribution, Uniform};
 
 use super::VariablesManager;
 
@@ -27,12 +20,11 @@ pub struct VariablesManagerPy {
     pub semantic_groups_map: HashMap<String, Vec<usize>>,
     pub semantic_group_keys: Vec<String>,
     pub n_semantic_groups: usize,
-    pub discrete_ids: Option<Vec<usize>>
+    pub discrete_ids: Option<Vec<usize>>,
 }
 
 #[pymethods]
 impl VariablesManagerPy {
-    
     #[getter]
     pub fn variables_count(&self) -> PyResult<usize> {
         Ok(self.variables_count.clone())
@@ -51,18 +43,23 @@ impl VariablesManagerPy {
     #[new]
     #[pyo3(signature = (variables_vec_py))]
     pub fn new(variables_vec_py: Vec<GJPlanningVariablePy>) -> PyResult<Self> {
-
-        let variables_vec: Vec<GJPlanningVariable> = variables_vec_py.iter().map(|var_py| {
-            GJPlanningVariable::new(
-                var_py.name.clone(), 
-                var_py.lower_bound, 
-                var_py.upper_bound, 
-                var_py.frozen, 
-                var_py.is_int, 
-                var_py.initial_value, 
-                Some(var_py.semantic_groups.clone()),
-            )
-        }).collect();
+        let variables_vec: Vec<GJPlanningVariable> = variables_vec_py
+            .iter()
+            .map(|var_py| {
+                GJPlanningVariable::new(
+                    var_py.name.clone(),
+                    var_py.lower_bound,
+                    var_py.upper_bound,
+                    var_py.frozen,
+                    var_py.is_int,
+                    var_py.initial_value,
+                    Some(var_py.semantic_groups.clone()),
+                )
+            })
+            .collect();
+        for variable in &variables_vec {
+            variable.validate().map_err(PyValueError::new_err)?;
+        }
         let mut variable_ids: Vec<usize> = Vec::new();
         let mut lower_bounds: Vec<f64> = Vec::new();
         let mut upper_bounds: Vec<f64> = Vec::new();
@@ -80,7 +77,8 @@ impl VariablesManagerPy {
         }
 
         let semantic_groups_dict = VariablesManager::build_semantic_groups_dict(&variables_vec);
-        let semantic_group_keys: Vec<String> = semantic_groups_dict.keys().into_vec().iter().map(|x| x.to_string()).collect();
+        let mut semantic_group_keys: Vec<String> = semantic_groups_dict.keys().cloned().collect();
+        semantic_group_keys.sort();
         let n_semantic_groups = semantic_group_keys.len();
         let discrete_ids_option;
         if discrete_ids.len() != 0 {
@@ -99,27 +97,35 @@ impl VariablesManagerPy {
             semantic_groups_map: semantic_groups_dict,
             semantic_group_keys: semantic_group_keys,
             n_semantic_groups: n_semantic_groups,
-            discrete_ids: discrete_ids_option
+            discrete_ids: discrete_ids_option,
         })
-
     }
 
-    pub fn get_random_semantic_group_ids(&self) -> (&Vec<usize>, &String) {
+    pub fn get_random_semantic_group_ids(&self) -> PyResult<(&Vec<usize>, &String)> {
+        if self.n_semantic_groups == 0 {
+            return Err(PyValueError::new_err(
+                "No mutable semantic groups are available",
+            ));
+        }
         let random_group_id = RngUtils::get_random_id(0, self.n_semantic_groups);
         let group_name = &self.semantic_group_keys[random_group_id];
         let group_ids = self.semantic_groups_map.get(group_name).unwrap();
-        (group_ids, group_name)
+        Ok((group_ids, group_name))
     }
 
     // FIXED: Use centralized RNG
-    pub fn get_column_random_value(&self, column_id: usize) -> f64 {
-        RngUtils::get_random_f64_range(self.lower_bounds[column_id], self.upper_bounds[column_id])
+    pub fn get_column_random_value(&self, column_id: usize) -> PyResult<f64> {
+        let variable = self
+            .variables_vec
+            .get(column_id)
+            .ok_or_else(|| PyIndexError::new_err("Variable index is out of range"))?;
+        Ok(variable.sample())
     }
 
     // FIXED: Use centralized RNG for variable sampling
     pub fn sample_variables(&mut self) -> Vec<f64> {
         let mut values_array: Vec<f64> = Vec::with_capacity(self.variables_count);
-        
+
         for variable in &self.variables_vec {
             let generated_value = variable.get_initial_value();
             values_array.push(generated_value);
@@ -129,42 +135,52 @@ impl VariablesManagerPy {
     }
 
     pub fn get_variables_names_vec(&self) -> Vec<String> {
-        self.variables_vec.iter().map(|variable| {
-            variable.name.clone()
-        }).collect()
+        self.variables_vec
+            .iter()
+            .map(|variable| variable.name.clone())
+            .collect()
     }
 
-    pub fn fix_variables(&self, values_array: Vec<f64>, ids_to_fix: Option<Vec<usize>>) -> PyResult<Vec<f64>> {
-
+    pub fn fix_variables(
+        &self,
+        values_array: Vec<f64>,
+        ids_to_fix: Option<Vec<usize>>,
+    ) -> PyResult<Vec<f64>> {
         let range_ids;
         match ids_to_fix {
             Some(partial_ids) => range_ids = partial_ids,
-            None => range_ids = Vec::from_iter( (0..self.variables_count).into_iter() )
+            None => range_ids = Vec::from_iter((0..self.variables_count).into_iter()),
         }
 
         let mut values_array_clone = values_array.clone();
-        let stub_collection: () = range_ids.iter().map(|i| {
-            values_array_clone[*i] = self.variables_vec[*i].fix(values_array[*i])
-        }).collect();
+        let stub_collection: () = range_ids
+            .iter()
+            .map(|i| values_array_clone[*i] = self.variables_vec[*i].fix(values_array[*i]))
+            .collect();
 
         return Ok(values_array_clone);
     }
 
-    pub fn fix_deltas(&self, deltas: Vec<f64>, ids_to_fix: Option<Vec<usize>>) -> PyResult<Vec<f64>> {
-
+    pub fn fix_deltas(
+        &self,
+        deltas: Vec<f64>,
+        ids_to_fix: Option<Vec<usize>>,
+    ) -> PyResult<Vec<f64>> {
         let range_ids;
         match ids_to_fix {
             Some(partial_ids) => range_ids = partial_ids,
-            None => range_ids = Vec::from_iter( (0..self.variables_count).into_iter() )
+            None => range_ids = Vec::from_iter((0..self.variables_count).into_iter()),
         }
 
         let mut deltas_clone = deltas.clone();
-        let _: () = range_ids.iter().enumerate()
-        .map(|(delta_id, var_id)| {
-            deltas_clone[delta_id] = self.variables_vec[*var_id].fix(deltas[delta_id])
-        }).collect();
+        let _: () = range_ids
+            .iter()
+            .enumerate()
+            .map(|(delta_id, var_id)| {
+                deltas_clone[delta_id] = self.variables_vec[*var_id].fix(deltas[delta_id])
+            })
+            .collect();
 
         return Ok(deltas_clone);
     }
-
 }

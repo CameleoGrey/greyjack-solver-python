@@ -1,7 +1,6 @@
-
-
+use super::GJPlanningVariable;
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-
 
 #[pyclass]
 #[derive(FromPyObject, Debug)]
@@ -17,7 +16,6 @@ pub struct GJPlanningVariablePy {
 
 #[pymethods]
 impl GJPlanningVariablePy {
-
     #[getter]
     pub fn name(&self) -> PyResult<String> {
         Ok(self.name.clone())
@@ -28,7 +26,6 @@ impl GJPlanningVariablePy {
         self.name = name;
         Ok(())
     }
-    
 
     #[getter]
     pub fn initial_value(&self) -> PyResult<Option<f64>> {
@@ -62,18 +59,36 @@ impl GJPlanningVariablePy {
 
     #[new]
     #[pyo3(signature = (lower_bound, upper_bound, frozen, is_int, initial_value=None, semantic_groups=None))]
-    pub fn new(lower_bound: f64, upper_bound: f64, frozen: bool, is_int: bool, initial_value: Option<f64>, semantic_groups: Option<Vec<String>>)  -> PyResult<Self> {
-        
+    pub fn new(
+        lower_bound: f64,
+        upper_bound: f64,
+        frozen: bool,
+        is_int: bool,
+        initial_value: Option<f64>,
+        semantic_groups: Option<Vec<String>>,
+    ) -> PyResult<Self> {
         let mut current_semantic_groups: Vec<String> = Vec::new();
-            match semantic_groups {
-                None => current_semantic_groups.push("common".to_string()),
-                Some(groups) => {
-                    for group in groups {
-                        current_semantic_groups.push(group);
-                    }
-                },
+        match semantic_groups {
+            None => current_semantic_groups.push("common".to_string()),
+            Some(groups) => {
+                for group in groups {
+                    current_semantic_groups.push(group);
+                }
             }
-        
+        }
+
+        GJPlanningVariable::new(
+            String::new(),
+            lower_bound,
+            upper_bound,
+            frozen,
+            is_int,
+            initial_value,
+            Some(current_semantic_groups.clone()),
+        )
+        .validate()
+        .map_err(PyValueError::new_err)?;
+
         Ok(GJPlanningVariablePy {
             name: "".to_string(),
             initial_value: initial_value,

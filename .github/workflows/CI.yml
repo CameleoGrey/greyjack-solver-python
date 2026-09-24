@@ -1,13 +1,9 @@
-# Build native wheels, then exercise the installed artifacts and dependencies.
 name: CI
 
 on:
   push:
-    branches:
-      - main
-      - master
-    tags:
-      - '*'
+    branches: [main, master]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -15,165 +11,253 @@ permissions:
   contents: read
 
 env:
-  # Keep optimized wheel builds practical on hosted runners with 7 GB RAM.
+  RELEASE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+  # Retain opt-level 3 while fitting hosted runners with as little as 7 GB RAM.
   CARGO_PROFILE_RELEASE_LTO: thin
   CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '16'
   CARGO_PROFILE_RELEASE_DEBUG: '0'
   CARGO_BUILD_JOBS: '2'
 
 jobs:
-  linux:
-    runs-on: ${{ matrix.platform.runner }}
-    strategy:
-      matrix:
-        python-version: ['3.10', '3.12']
-        platform:
-          - runner: ubuntu-22.04
-            target: x86_64
+  metadata:
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install packaging
+      - name: Check package and tag versions
+        id: version
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          import tomllib
+          from pathlib import Path
+          from packaging.version import Version
+
+          project = tomllib.loads(Path('greyjack/pyproject.toml').read_text())['project']
+          crate = tomllib.loads(Path('greyjack/Cargo.toml').read_text())['package']
+          version = project['version']
+          assert version == crate['version'], 'Python and Cargo versions differ'
+          if os.environ['GITHUB_REF_TYPE'] == 'tag':
+              assert os.environ['GITHUB_REF_NAME'] == f'v{version}', 'Tag and package versions differ'
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              print(f'version={version}', file=output)
+              print(f'prerelease={str(Version(version).is_prerelease).lower()}', file=output)
+          PY
+
+  wheels:
+    name: Wheel ${{ matrix.platform.name }} CPython ${{ matrix.python-version }}
+    needs: metadata
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
+        platform:
+          - name: linux
+            runner: ubuntu-22.04
+            target: x86_64
+            manylinux: '2_28'
+            compatibility: manylinux_2_28
+          - name: windows
+            runner: windows-latest
+            target: x64
+            manylinux: 'off'
+            compatibility: pypi
+          - name: macos
+            runner: macos-15
+            target: aarch64
+            manylinux: 'off'
+            compatibility: pypi
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Build wheels
+      - name: Build one stripped wheel
         uses: PyO3/maturin-action@v1
         with:
+          maturin-version: '1.15.0'
           rust-toolchain: '1.98.1'
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python${{ matrix.python-version }} --manifest-path ./greyjack/Cargo.toml
+          manylinux: ${{ matrix.platform.manylinux }}
+          args: >-
+            --release --strip --locked --out dist
+            --compatibility ${{ matrix.platform.compatibility }}
+            -i ${{ matrix.platform.name == 'linux' && format('python{0}', matrix.python-version) || 'python' }}
+            --manifest-path ./greyjack/Cargo.toml
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-          manylinux: auto
-      - name: Install built wheel and test dependencies
+      - name: Install built wheel and fresh dependencies
         shell: bash
-        run: python -m pip install --force-reinstall dist/*.whl "polars==1.44.2" pytest
+        run: |
+          python -m pip install --upgrade --force-reinstall --no-cache-dir dist/*.whl pytest packaging
+          python -m pip check
+      - name: Validate archive and record exact bytes
+        shell: bash
+        run: >-
+          python greyjack/scripts/validate_artifacts.py dist
+          --version '${{ needs.metadata.outputs.version }}' --commit "$RELEASE_COMMIT"
+          --python '${{ matrix.python-version }}' --platform '${{ matrix.platform.name }}'
+          --output 'dist/inventory-${{ matrix.platform.name }}-${{ matrix.python-version }}.json'
       - name: Test installed wheel outside checkout
         working-directory: ${{ runner.temp }}
         shell: bash
         run: |
-          python -I -c 'import os, pathlib, greyjack, polars; assert pathlib.Path(os.environ["GITHUB_WORKSPACE"]).resolve() not in pathlib.Path(greyjack.__file__).resolve().parents, greyjack.__file__; assert polars.__version__ == "1.44.2"; print(greyjack.__file__, polars.__version__)'
+          python -I "$GITHUB_WORKSPACE/greyjack/scripts/verify_install.py" --version '${{ needs.metadata.outputs.version }}' --checkout "$GITHUB_WORKSPACE"
           python -I -m pytest --import-mode=importlib "$GITHUB_WORKSPACE/greyjack/tests"
-      - name: Upload wheels
+      - name: Upload tested wheel
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-linux-${{ matrix.platform.target }}-py${{ matrix.python-version }}
+          name: release-wheel-${{ matrix.platform.name }}-${{ matrix.python-version }}
           path: dist
-
-  windows:
-    runs-on: ${{ matrix.platform.runner }}
-    strategy:
-      matrix:
-        platform:
-          - runner: windows-latest
-            target: x64
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          architecture: ${{ matrix.platform.target }}
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          rust-toolchain: '1.98.1'
-          target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python --manifest-path ./greyjack/Cargo.toml
-          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-      - name: Install built wheel and test dependencies
-        shell: bash
-        run: python -m pip install --force-reinstall dist/*.whl "polars==1.44.2" pytest
-      - name: Test installed wheel outside checkout
-        working-directory: ${{ runner.temp }}
-        shell: bash
-        run: |
-          python -I -c 'import os, pathlib, greyjack, polars; assert pathlib.Path(os.environ["GITHUB_WORKSPACE"]).resolve() not in pathlib.Path(greyjack.__file__).resolve().parents, greyjack.__file__; assert polars.__version__ == "1.44.2"; print(greyjack.__file__, polars.__version__)'
-          python -I -m pytest --import-mode=importlib "$GITHUB_WORKSPACE/greyjack/tests"
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-windows-${{ matrix.platform.target }}
-          path: dist
-
-  macos:
-    runs-on: ${{ matrix.platform.runner }}
-    strategy:
-      matrix:
-        platform:
-          - runner: macos-15-intel
-            target: x86_64
-          - runner: macos-15
-            target: aarch64
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          rust-toolchain: '1.98.1'
-          target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python --manifest-path ./greyjack/Cargo.toml
-          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-      - name: Install built wheel and test dependencies
-        shell: bash
-        run: python -m pip install --force-reinstall dist/*.whl "polars==1.44.2" pytest
-      - name: Test installed wheel outside checkout
-        working-directory: ${{ runner.temp }}
-        shell: bash
-        run: |
-          python -I -c 'import os, pathlib, greyjack, polars; assert pathlib.Path(os.environ["GITHUB_WORKSPACE"]).resolve() not in pathlib.Path(greyjack.__file__).resolve().parents, greyjack.__file__; assert polars.__version__ == "1.44.2"; print(greyjack.__file__, polars.__version__)'
-          python -I -m pytest --import-mode=importlib "$GITHUB_WORKSPACE/greyjack/tests"
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-macos-${{ matrix.platform.target }}
-          path: dist
+          if-no-files-found: error
 
   sdist:
-    runs-on: ubuntu-latest
+    name: Source distribution rebuild
+    needs: metadata
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - name: Build sdist
-        uses: PyO3/maturin-action@v1
         with:
-          rust-toolchain: '1.98.1'
-          command: sdist
-          args: --out dist --manifest-path ./greyjack/Cargo.toml
-      - name: Upload sdist
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.98.1'
+      - name: Install build and validation tools
+        run: python -m pip install 'maturin==1.15.0' packaging pytest
+      - name: Build authoritative source distribution
+        shell: bash
+        run: |
+          cargo metadata --locked --format-version 1 --no-deps --manifest-path greyjack/Cargo.toml > /dev/null
+          python -m maturin sdist --out dist --manifest-path greyjack/Cargo.toml
+      - name: Validate and extract outside checkout
+        shell: bash
+        run: >-
+          python greyjack/scripts/validate_artifacts.py dist
+          --version '${{ needs.metadata.outputs.version }}' --commit "$RELEASE_COMMIT"
+          --output dist/inventory-sdist.json --extract-sdist "$RUNNER_TEMP/sdist-source"
+      - name: Build a wheel from extracted source only
+        working-directory: ${{ runner.temp }}
+        shell: bash
+        run: >-
+          python -m maturin build --release --strip --locked --compatibility pypi
+          --out "$RUNNER_TEMP/sdist-wheel" -i python
+          --manifest-path "$RUNNER_TEMP/sdist-source/greyjack-${{ needs.metadata.outputs.version }}/Cargo.toml"
+      - name: Install rebuilt wheel and fresh dependencies
+        working-directory: ${{ runner.temp }}
+        shell: bash
+        run: |
+          python -m pip install --upgrade --force-reinstall --no-cache-dir "$RUNNER_TEMP"/sdist-wheel/*.whl pytest packaging
+          python -m pip check
+          python -I "$GITHUB_WORKSPACE/greyjack/scripts/validate_artifacts.py" "$RUNNER_TEMP/sdist-wheel" --version '${{ needs.metadata.outputs.version }}' --commit "$RELEASE_COMMIT" --python 3.12
+      - name: Test source-built installed wheel
+        working-directory: ${{ runner.temp }}
+        shell: bash
+        run: |
+          python -I "$GITHUB_WORKSPACE/greyjack/scripts/verify_install.py" --version '${{ needs.metadata.outputs.version }}' --checkout "$GITHUB_WORKSPACE"
+          python -I "$GITHUB_WORKSPACE/greyjack/scripts/verify_install.py" --version '${{ needs.metadata.outputs.version }}' --checkout "$RUNNER_TEMP/sdist-source"
+          python -I -m pytest --import-mode=importlib "$GITHUB_WORKSPACE/greyjack/tests"
+      - name: Upload tested source distribution
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-sdist
+          name: release-sdist
           path: dist
+          if-no-files-found: error
+
+  rust-tests:
+    name: Rust unit tests
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.98.1'
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: greyjack
+      - name: Test with Python linking enabled
+        shell: bash
+        run: |
+          export PYO3_PYTHON="$(python -c 'import sys; print(sys.executable)')"
+          cargo test --release --locked --manifest-path greyjack/Cargo.toml --lib
+
+  artifacts:
+    name: Collect validated release artifacts
+    needs: [metadata, wheels, sdist, rust-tests]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install packaging
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+      - name: Require all 15 wheels and one source distribution
+        shell: bash
+        run: >-
+          python greyjack/scripts/validate_artifacts.py dist --complete
+          --version '${{ needs.metadata.outputs.version }}' --commit "$RELEASE_COMMIT"
+          --output dist/inventory.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: dist
+          if-no-files-found: error
 
   release:
-    name: Release
-    runs-on: ubuntu-latest
-    if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
-    needs: [linux, windows, macos, sdist]
+    name: Attach tested files to versioned GitHub release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [metadata, artifacts]
+    runs-on: ubuntu-22.04
     permissions:
-      # Use to sign the release artifacts
-      id-token: write
-      # Used to upload release artifacts
       contents: write
-      # Used to generate artifact attestation
-      attestations: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install packaging
       - uses: actions/download-artifact@v4
-      - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v1
         with:
-          subject-path: 'wheels-*/*'
-      - name: Publish to PyPI
-        if: ${{ startsWith(github.ref, 'refs/tags/') }}
-        uses: PyO3/maturin-action@v1
-        env:
-          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-        with:
-          command: upload
-          args: --non-interactive --skip-existing wheels-*/*
-      - name: Upload to GitHub Release
-        uses: softprops/action-gh-release@v1
+          name: release-artifacts
+          path: dist
+      - name: Verify tag and exact tested bytes
+        shell: bash
+        run: >-
+          python greyjack/scripts/validate_artifacts.py dist --complete
+          --version '${{ needs.metadata.outputs.version }}' --commit "$RELEASE_COMMIT"
+          --tag "$GITHUB_REF_NAME" --verify-inventory dist/inventory.json
+      - uses: softprops/action-gh-release@v2
         with:
           files: |
-            wasm-wheels/*.whl
-          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
+            dist/*.whl
+            dist/*.tar.gz
+            dist/inventory.json
+          fail_on_unmatched_files: true
+          prerelease: ${{ needs.metadata.outputs.prerelease == 'true' }}

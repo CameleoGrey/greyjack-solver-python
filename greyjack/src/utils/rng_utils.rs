@@ -1,7 +1,7 @@
-use rand::{rngs::StdRng, SeedableRng, Rng};
-use rand_distr::{Distribution, Uniform, Normal};
-use std::cell::RefCell;
 use once_cell::sync::Lazy;
+use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand_distr::{Distribution, Normal, Uniform};
+use std::cell::RefCell;
 
 // Thread-local RNG - much faster than creating new instances
 thread_local! {
@@ -12,6 +12,12 @@ thread_local! {
 pub struct RngUtils;
 
 impl RngUtils {
+    /// Deterministic test seam; production callers still use entropy-seeded RNGs.
+    #[cfg(test)]
+    pub(crate) fn seed_for_tests(seed: u64) {
+        THREAD_RNG.with(|rng| *rng.borrow_mut() = StdRng::seed_from_u64(seed));
+    }
+
     /// Get a random integer in range [start, end)
     pub fn get_random_id(start_id: usize, end_exclusive: usize) -> usize {
         THREAD_RNG.with(|rng| {
@@ -44,19 +50,23 @@ impl RngUtils {
     /// Choose random elements without replacement
     pub fn choice_without_replacement<T: Clone>(objects: &[T], n: usize) -> Vec<T> {
         if n > objects.len() {
-            panic!("Cannot choose {} elements from {} without replacement", n, objects.len());
+            panic!(
+                "Cannot choose {} elements from {} without replacement",
+                n,
+                objects.len()
+            );
         }
 
         THREAD_RNG.with(|rng| {
             let mut rng = rng.borrow_mut();
             let mut indices: Vec<usize> = (0..objects.len()).collect();
-            
+
             // Fisher-Yates shuffle (partial)
             for i in 0..n {
                 let j = rng.gen_range(i..indices.len());
                 indices.swap(i, j);
             }
-            
+
             indices[..n].iter().map(|&i| objects[i].clone()).collect()
         })
     }
@@ -65,10 +75,12 @@ impl RngUtils {
     pub fn choice_with_replacement<T: Clone>(objects: &[T], n: usize) -> Vec<T> {
         THREAD_RNG.with(|rng| {
             let mut rng = rng.borrow_mut();
-            (0..n).map(|_| {
-                let idx = rng.gen_range(0..objects.len());
-                objects[idx].clone()
-            }).collect()
+            (0..n)
+                .map(|_| {
+                    let idx = rng.gen_range(0..objects.len());
+                    objects[idx].clone()
+                })
+                .collect()
         })
     }
 
@@ -76,7 +88,7 @@ impl RngUtils {
     pub fn shuffle<T>(slice: &mut [T]) {
         THREAD_RNG.with(|rng| {
             let mut rng = rng.borrow_mut();
-            
+
             // Fisher-Yates shuffle
             for i in (1..slice.len()).rev() {
                 let j = rng.gen_range(0..=i);

@@ -135,7 +135,6 @@ def test_all_native_search_bindings_score_and_step(
     common = {
         "termination_strategy": termination,
         "tabu_entity_rate": 0.0,
-        "move_probas": [0.5, 0.5, 0, 0, 0, 0],
     }
     if algorithm == "tabu":
         agent = TabuSearch(neighbours_count=4, **common)

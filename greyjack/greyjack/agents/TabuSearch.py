@@ -51,7 +51,7 @@ class TabuSearch(Agent):
             self.tabu_entity_rate,
             semantic_groups_dict,
             self.mutation_rate_multiplier,
-            self.move_probas.copy() if self.move_probas else None,
+            self.move_probas.copy() if self.move_probas is not None else None,
             discrete_ids,
         )
 
