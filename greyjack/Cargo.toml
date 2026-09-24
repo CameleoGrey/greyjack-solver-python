@@ -12,7 +12,7 @@ crate-type = ["cdylib"]
 [dependencies]
 pyo3 = "0.29.2"
 pyo3-polars = "0.28.0"
-rand = "0.8.5"
+rand = "0.8.6"
 rand_distr = "0.4.3"
 ndarray = "0.16.1"
 ndarray-rand = "0.15.0"

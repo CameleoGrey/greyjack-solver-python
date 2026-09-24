@@ -1,5 +1,5 @@
-use super::super::utils::rng_utils::RngUtils;
 use super::super::utils::math_utils::rint;
+use super::super::utils::rng_utils::RngUtils;
 
 #[derive(Clone, Debug)]
 pub struct GJPlanningVariable {
@@ -17,6 +17,42 @@ pub struct GJPlanningVariable {
 }
 
 impl GJPlanningVariable {
+    pub fn is_changeable(&self) -> bool {
+        !self.frozen && self.lower_bound < self.upper_bound
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if !self.lower_bound.is_finite() || !self.upper_bound.is_finite() {
+            return Err("Variable bounds must be finite".to_string());
+        }
+        if self.lower_bound > self.upper_bound {
+            return Err("Variable lower_bound must not exceed upper_bound".to_string());
+        }
+        if self.is_changeable() && !(self.upper_bound - self.lower_bound).is_finite() {
+            return Err("Variable range must have finite width for random sampling".to_string());
+        }
+        if self.is_int && (self.lower_bound.fract() != 0.0 || self.upper_bound.fract() != 0.0) {
+            return Err("Integer variable bounds must be integral".to_string());
+        }
+        if self.frozen && self.initial_value.is_none() {
+            return Err("Frozen variables require an initial_value".to_string());
+        }
+        if let Some(value) = self.initial_value {
+            if !value.is_finite() || value < self.lower_bound || value > self.upper_bound {
+                return Err(
+                    "initial_value must be finite and within the variable bounds".to_string(),
+                );
+            }
+            if self.is_int && value.fract() != 0.0 {
+                return Err("Integer variable initial_value must be integral".to_string());
+            }
+        }
+        if self.is_changeable() && self.semantic_groups.is_empty() {
+            return Err("Mutable variables require at least one semantic group".to_string());
+        }
+        Ok(())
+    }
+
     pub fn new(
         name: String,
         lower_bound: f64,
@@ -45,7 +81,9 @@ impl GJPlanningVariable {
 
     pub fn fix(&self, value: f64) -> f64 {
         if self.frozen {
-            return self.initial_value.expect("Frozen value must be initialized");
+            return self
+                .initial_value
+                .expect("Frozen value must be initialized");
         }
 
         let mut fixed_value = value.clamp(self.lower_bound, self.upper_bound);
@@ -59,7 +97,13 @@ impl GJPlanningVariable {
     // FIXED: Use centralized RNG
     pub fn sample(&self) -> f64 {
         if self.frozen {
-            return self.initial_value.expect("Frozen value must be initialized");
+            return self
+                .initial_value
+                .expect("Frozen value must be initialized");
+        }
+
+        if self.lower_bound == self.upper_bound {
+            return self.lower_bound;
         }
 
         RngUtils::get_random_f64_range(self.lower_bound, self.upper_bound)

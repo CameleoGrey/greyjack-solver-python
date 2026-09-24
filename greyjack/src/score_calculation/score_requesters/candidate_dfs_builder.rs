@@ -240,76 +240,61 @@ impl CandidateDfsBuilder {
         }
 
         pub fn build_delta_dfs(
-            &mut self, 
-            group_data_map: &HashMap<String, HashMap<String, Vec<f64>>>, 
-            inverted_deltas: Vec<Vec<(usize, f64)>>
+            &mut self,
+            group_data_map: &HashMap<String, HashMap<String, Vec<f64>>>,
+            inverted_deltas: Vec<Vec<(usize, f64)>>,
         ) -> HashMap<String, DataFrame> {
-
-            if self.var_id_to_df_column_index_map.len() == 0 {
+            if self.var_id_to_df_column_index_map.is_empty() {
                 self.var_id_to_df_column_index_map = self.build_var_id_to_df_column_index_map();
             }
 
-            let mut delta_data_map: HashMap<String, HashMap<String, Vec<f64>>> = HashMap::default();
-            (0..inverted_deltas.len()).into_iter().for_each(|sample_id| {
+            // One complete planning-variable row per (candidate, entity). Seed it
+            // from the unchanged sample once, then compose every assignment in
+            // input order, including last-write-wins for repeated variable IDs.
+            type CandidateRows = std::collections::BTreeMap<
+                (usize, usize),
+                HashMap<String, f64>,
+            >;
+            let mut rows_by_df: HashMap<String, CandidateRows> = HashMap::new();
+            for (sample_id, deltas) in inverted_deltas.into_iter().enumerate() {
+                for (var_id, new_value) in deltas {
+                    let (df_name, column_name, row_id) =
+                        &self.var_id_to_df_column_index_map[var_id];
+                    let row = rows_by_df.entry(df_name.clone()).or_default()
+                        .entry((sample_id, *row_id))
+                        .or_insert_with(|| {
+                            group_data_map[df_name].iter()
+                                .map(|(name, values)| (name.clone(), values[*row_id]))
+                                .collect()
+                        });
+                    row.insert(column_name.clone(), new_value);
+                }
+            }
 
-                let current_sample_deltas = inverted_deltas[sample_id].clone();
-                current_sample_deltas.iter().for_each(|(var_id, new_value)| {
-
-                    let (df_name, var_col_name, row_id) = self.var_id_to_df_column_index_map[*var_id].clone();
-                    if delta_data_map.contains_key(&df_name) == false {
-                        delta_data_map.insert(df_name.clone(), HashMap::default());
-                        delta_data_map.get_mut(&df_name).unwrap().insert("sample_id".to_string(), Vec::new());
-                        delta_data_map.get_mut(&df_name).unwrap().insert("candidate_df_row_id".to_string(), Vec::new());
+            let mut delta_dfs = HashMap::new();
+            for (df_name, rows) in rows_by_df {
+                let sample_ids: Vec<i64> = rows.keys().map(|(sample_id, _)| *sample_id as i64).collect();
+                let row_ids: Vec<i64> = rows.keys().map(|(_, row_id)| *row_id as i64).collect();
+                let mut current_df = DataFrame::new(rows.len(), vec![
+                    Series::new("sample_id".into(), sample_ids).into(),
+                    Series::new("candidate_df_row_id".into(), row_ids).into(),
+                ]).unwrap();
+                let mut column_names: Vec<_> = group_data_map[&df_name].keys().collect();
+                column_names.sort();
+                for column_name in column_names {
+                    let values: Vec<f64> = rows.values().map(|row| row[column_name]).collect();
+                    let mut column = Series::new(column_name.into(), values);
+                    if self.entity_is_int_map.get(column_name).copied().unwrap_or(false) {
+                        column = column.cast(&DataType::Int64).unwrap();
                     }
-
-                    delta_data_map.get_mut(&df_name).unwrap().get_mut("sample_id").unwrap().push(sample_id as f64);
-                    delta_data_map.get_mut(&df_name).unwrap().get_mut("candidate_df_row_id").unwrap().push(row_id as f64);
-
-                    let current_df_column_data = group_data_map.get(&df_name).unwrap();
-                    current_df_column_data.iter().for_each(|(column_name, column_values)| {
-                        if delta_data_map.get(&df_name).unwrap().contains_key(column_name) == false {
-                            delta_data_map.get_mut(&df_name).unwrap().insert(column_name.clone(), Vec::new());
-                        }
-
-                        if column_name.eq(&var_col_name) {
-                            delta_data_map.get_mut(&df_name).unwrap().get_mut(column_name).unwrap().push(new_value.clone());
-                        } else {
-                            delta_data_map.get_mut(&df_name).unwrap().get_mut(column_name).unwrap().push(column_values[row_id].clone());
-                        }
-                    });
-                });
-            });
-
-            let mut delta_dfs: HashMap<String, DataFrame> = HashMap::default();
-            delta_data_map.keys().into_iter().for_each(|df_name| {
-
-                let mut current_df = DataFrame::empty();
-                delta_data_map[df_name].keys().into_iter().for_each(|column_name| {
-
-                    let updated_column_data = &delta_data_map[df_name][column_name];
-                    let mut updated_column = Series::new(column_name.into(), updated_column_data);
-
-                    if self.entity_is_int_map.contains_key(column_name) {
-                        if *self.entity_is_int_map.get(column_name).unwrap() {
-                            updated_column = updated_column.cast(&DataType::Int64).unwrap();
-                        }
-                    } else if column_name.eq("sample_id") {
-                        // using Int64 instead UInt64 because Python converts UInt64 to float
-                        updated_column = updated_column.cast(&DataType::Int64).unwrap();
-                    } else if column_name.eq("candidate_df_row_id") {
-                        // using Int64 instead UInt64 because Python converts UInt64 to float
-                        updated_column = updated_column.cast(&DataType::Int64).unwrap();
-                    }
-
-
-                    current_df.with_column(updated_column.into()).unwrap();
-                });
-                current_df = current_df.sort(["sample_id", "candidate_df_row_id"], SortMultipleOptions::default()).unwrap();
-
-                delta_dfs.insert(df_name.clone(), current_df);
-            });
-
-            return delta_dfs;
+                    current_df.with_column(column.into()).unwrap();
+                }
+                current_df = current_df.sort(
+                    ["sample_id", "candidate_df_row_id"], SortMultipleOptions::default(),
+                ).unwrap();
+                delta_dfs.insert(df_name, current_df);
+            }
+            delta_dfs
         }
 
         pub fn get_plain_candidate_dfs(&mut self, samples: &Vec<Vec<f64>>) -> (HashMap<String, DataFrame>, HashMap<String, DataFrame>) {

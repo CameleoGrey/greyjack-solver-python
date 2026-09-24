@@ -43,8 +43,10 @@ a matching native rebuild and interoperability checks.
 
 Source builds require Rust 1.95 or newer. The repository toolchain is pinned to
 1.98.1 in `rust-toolchain.toml`; rustup selects it when building this checkout.
-CI builds and tests installed wheels on Linux, Windows, and macOS with Python
-3.12, plus Linux with Python 3.10, using Polars 1.44.2. The tests run outside the
+CI builds and tests installed wheels for CPython 3.10 through 3.14 on Linux
+x86_64 (glibc 2.28+), Windows amd64, and macOS ARM64. Intel macOS is outside the
+wheel matrix because mandatory Numba 0.63+ no longer supplies Intel macOS wheels.
+The tests resolve dependencies within the supported Polars range and run outside the
 checkout and verify the installed package path so local sources cannot conceal
 a broken wheel. Workflow configuration describes the checks; successful remote
 runs provide the evidence that those checks passed.
@@ -53,6 +55,12 @@ CI limits build memory for hosted runners with as little as 7 GB RAM by using
 ThinLTO, 16 codegen units, no debug information, and two build jobs. These
 workflow-only overrides retain release optimization level 3; local Cargo release
 settings are unchanged.
+
+Releases use stripped wheels and one source distribution that is rebuilt and
+tested outside the checkout. Branch and manual CI runs only prepare artifacts;
+matching `v*` tag pushes attach them to GitHub releases. PyPI publishing remains
+manual. See [RELEASING.md](RELEASING.md) for the 0.3.9 changes, artifact inventory,
+local build commands, and publishing the exact tested CI files with Maturin.
 
 # Develop GreyJack and run examples locally
 

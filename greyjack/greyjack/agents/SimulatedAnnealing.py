@@ -67,7 +67,7 @@ class SimulatedAnnealing(Agent):
             semantic_groups_dict,
             self.cooling_rate,
             self.mutation_rate_multiplier,
-            self.move_probas.copy() if self.move_probas else None,
+            self.move_probas.copy() if self.move_probas is not None else None,
             discrete_ids,
         )
 
