@@ -6,11 +6,9 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "greyjack>=0.3.9",
+    "matplotlib>=3.11.2",
     "ortools>=9.15.6755",
 ]
-
-[tool.uv.sources]
-greyjack = { path = "../greyjack", editable = true }
 
 [dependency-groups]
 dev = ["pytest>=8,<10"]

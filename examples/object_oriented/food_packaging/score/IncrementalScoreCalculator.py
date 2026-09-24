@@ -2,10 +2,8 @@
 from greyjack.score_calculation.score_calculators.IncrementalScoreCalculator import IncrementalScoreCalculator
 from greyjack.score_calculation.scores.HardMediumSoftScore import HardMediumSoftScore
 from greyjack.score_calculation.scores.ScoreVariants import ScoreVariants
-import polars as pl
 import numpy as np
-import numba
-from numba import jit, int64, float64, vectorize
+from numba import jit
 
 
 class IncrementalScoreCalculator(IncrementalScoreCalculator):
@@ -112,7 +110,7 @@ def compute_penalties(
         line_jobs[i] = line_jobs[i][sorted_ids]
 
     all_jobs_start_production_times = np.zeros((n_jobs, ), np.int64)
-    all_jobs_start_cleaning_times = np.zeros((n_jobs, ), np.int64)
+    all_jobs_end_production_times = np.zeros((n_jobs, ), np.int64)
     all_jobs_operators = np.zeros((n_jobs, ), np.int64)
 
     unique_positions_penalty = 0
@@ -128,36 +126,27 @@ def compute_penalties(
         if current_line_jobs.shape[0] == 0:
             continue
         
-        job_start_cleaning = np.zeros((current_line_jobs.shape[0], ), np.int64)
-        job_end_cleaning = np.zeros((current_line_jobs.shape[0], ), np.int64)
-        line_jobs_ids = np.zeros((current_line_jobs.shape[0], ), np.int64)
-        job_start_production_times = np.zeros((current_line_jobs.shape[0], ), np.int64)
         job_end_times = np.zeros((current_line_jobs.shape[0], ), np.int64)
         job_ideal_times = np.zeros((current_line_jobs.shape[0], ), np.int64)
         job_max_end_times = np.zeros((current_line_jobs.shape[0], ), np.int64)
-        line_product_ids = np.zeros((current_line_jobs.shape[0], ), np.int64)
         for j, job_id in enumerate(current_line_jobs):
-            line_jobs_ids[j] = job_id
             all_jobs_operators[job_id] = operators[i]
             job_ideal_times[j] = ideal_end_times[job_id]
             job_max_end_times[j] = max_end_times[job_id]
-            line_product_ids[j] = product_ids[job_id]
 
-        job_start_production_times[0] += start_date_times[i]
-        job_end_cleaning[0] += start_date_times[i] + durations[line_jobs_ids[0]] # nothing to clean yet
-        all_jobs_start_cleaning_times[line_jobs_ids[0]] += job_end_cleaning[0]
-        all_jobs_start_production_times[line_jobs_ids[0]] += job_start_production_times[0]
-        for j in range(1, job_end_times.shape[0]):
-            job_start_production_times[j] += job_end_cleaning[j-1]
-            job_end_times[j] += job_start_production_times[j] + durations[line_jobs_ids[j]]
-            job_start_cleaning[j] += job_end_times[j]
-            current_cleaning_duration = cleaning_duration_matrix[line_product_ids[j]][line_product_ids[j-1]]
-            job_end_cleaning[j] += job_start_cleaning[j] + current_cleaning_duration
-            
-            cleaning_duration_penalty += priorities[line_jobs_ids[j]] * current_cleaning_duration
-
-            all_jobs_start_cleaning_times[line_jobs_ids[j]] = job_start_cleaning[j]
-            all_jobs_start_production_times[line_jobs_ids[j]] = job_start_production_times[j]
+        previous_end = start_date_times[i]
+        for j, job_id in enumerate(current_line_jobs):
+            cleaning_minutes = 0
+            if j > 0:
+                previous_job_id = current_line_jobs[j - 1]
+                cleaning_minutes = cleaning_duration_matrix[product_ids[job_id]][product_ids[previous_job_id]]
+                cleaning_duration_penalty += priorities[job_id] * cleaning_minutes
+            production_start = previous_end + cleaning_minutes
+            production_end = production_start + durations[job_id]
+            job_end_times[j] = production_end
+            all_jobs_start_production_times[job_id] = production_start
+            all_jobs_end_production_times[job_id] = production_end
+            previous_end = production_end
 
 
         for j in range(job_end_times.shape[0]):
@@ -179,10 +168,10 @@ def compute_penalties(
 
             job_i_start_production_time = all_jobs_start_production_times[job_i]
             job_j_start_production_time = all_jobs_start_production_times[job_j]
-            job_i_start_cleaning_time = all_jobs_start_cleaning_times[job_i]
-            job_j_start_cleaning_time = all_jobs_start_cleaning_times[job_j]
+            job_i_end_production_time = all_jobs_end_production_times[job_i]
+            job_j_end_production_time = all_jobs_end_production_times[job_j]
 
-            overlapping_minutes = min(job_i_start_cleaning_time, job_j_start_cleaning_time) - max(job_i_start_production_time, job_j_start_production_time)
+            overlapping_minutes = min(job_i_end_production_time, job_j_end_production_time) - max(job_i_start_production_time, job_j_start_production_time)
             operator_cleaning_conflict_penalty += overlapping_minutes if overlapping_minutes > 0 else 0
 
 

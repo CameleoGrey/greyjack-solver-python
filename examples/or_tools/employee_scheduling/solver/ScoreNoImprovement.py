@@ -1,0 +1,82 @@
+from collections.abc import Callable
+from threading import Event, Lock, Thread
+from time import monotonic
+
+from ortools.sat.python import cp_model
+
+
+class ScoreNoImprovement(cp_model.CpSolverSolutionCallback):
+    """Stop idle searches even when CP-SAT is not producing callbacks."""
+
+    def __init__(
+        self,
+        solver: cp_model.CpSolver,
+        hard_penalty: cp_model.IntVar,
+        soft_penalty_cents: cp_model.IntVar,
+        seconds: float,
+        clock: Callable[[], float] = monotonic,
+    ):
+        super().__init__()
+        self._solver = solver
+        self._hard_penalty = hard_penalty
+        self._soft_penalty_cents = soft_penalty_cents
+        self._seconds = seconds
+        self._clock = clock
+        self._lock = Lock()
+        self._finished = Event()
+        self._thread: Thread | None = None
+        self._best_score: tuple[int, int] | None = None
+        self._best_solution_count = 0
+        self._started_at = 0.0
+        self._deadline = 0.0
+        self._timed_out = False
+
+    @property
+    def timed_out(self) -> bool:
+        with self._lock:
+            return self._timed_out
+
+    def start(self) -> None:
+        with self._lock:
+            self._started_at = self._clock()
+            self._deadline = self._started_at + self._seconds
+        self._thread = Thread(
+            target=self._watch, name="employee-scheduling-idle-watchdog", daemon=True
+        )
+        self._thread.start()
+
+    def close(self) -> None:
+        self._finished.set()
+        if self._thread is not None:
+            self._thread.join()
+
+    def record_improvement(self, score: tuple[int, int]) -> None:
+        with self._lock:
+            if not self._timed_out and (
+                self._best_score is None or score < self._best_score
+            ):
+                self._best_score = score
+                now = self._clock()
+                self._deadline = now + self._seconds
+                self._best_solution_count += 1
+                print(
+                    f"[{now - self._started_at:.3f}s] "
+                    f"New best solution #{self._best_solution_count}: "
+                    f"hard_penalty={score[0]}, soft_penalty_cents={score[1]}",
+                    flush=True,
+                )
+
+    def on_solution_callback(self) -> None:
+        # Integer score components avoid precision loss in the scalar objective.
+        self.record_improvement(
+            (self.value(self._hard_penalty), self.value(self._soft_penalty_cents))
+        )
+
+    def _watch(self) -> None:
+        while not self._finished.wait(min(0.05, self._seconds)):
+            with self._lock:
+                if self._clock() >= self._deadline:
+                    self._timed_out = True
+                    # Retry until solve returns: a short deadline may expire before
+                    # CpSolver has installed its native solve wrapper.
+                    self._solver.stop_search()

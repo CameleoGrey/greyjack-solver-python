@@ -29,10 +29,10 @@ if __name__ == "__main__":
     #termination_strategy = ScoreLimit(score_to_compare=[0])
     """agent = TabuSearch(neighbours_count=128, tabu_entity_rate=0.05, 
                     mutation_rate_multiplier=None, move_probas=[0.5, 0.5, 0.0, 0.0, 0.0, 0.0], 
-                    migration_frequency=10, compare_to_global_frequency=0, termination_strategy=termination_strategy)"""
-    agent = LateAcceptance(late_acceptance_size=128, tabu_entity_rate=0.05, 
-                        mutation_rate_multiplier=None, move_probas=[0.5, 0.5, 0.0, 0.0, 0.0, 0.0], 
-                        migration_frequency=10000, compare_to_global_frequency=0, termination_strategy=termination_strategy)
+                    migration_frequency=9999999, compare_to_global_frequency=10, termination_strategy=termination_strategy)"""
+    agent = LateAcceptance(late_acceptance_size=64, tabu_entity_rate=0.05, 
+                        mutation_rate_multiplier=None, move_probas=None, 
+                        migration_frequency=99999999, compare_to_global_frequency=100, termination_strategy=termination_strategy)
     """agent = SimulatedAnnealing(initial_temperature=[1.0, 1.0], cooling_rate=0.9999, tabu_entity_rate=0.05, 
                             mutation_rate_multiplier=None, move_probas=None, 
                             migration_frequency=1000, compare_to_global_frequency=0, termination_strategy=termination_strategy)"""

@@ -47,3 +47,20 @@ completion and cannot safely be forcibly stopped while blocked.
 Some examples require datasets from
 [GreyJack example data](https://github.com/CameleoGrey/greyjack-data-for-examples).
 The employee scheduling demo generates its data locally.
+
+The independent OR-Tools examples have their own dependency files and run guides:
+
+- [Cloud balancing](or_tools/cloud_balancing/README.md)
+- [Employee scheduling](or_tools/employee_scheduling/README.md)
+- [Facility location](or_tools/facility_location/README.md)
+- [Food packaging](or_tools/food_packaging/README.md)
+- [Maintenance scheduling](or_tools/maintenance_scheduling/README.md)
+- [Vehicle routing with CP-SAT](or_tools/vrp_cp_sat/README.md)
+- [Vehicle routing with RoutingModel](or_tools/vrp_routing_model/README.md)
+
+Each OR-Tools example accepts `--mode strict` to enforce its business requirements
+and optimize the remaining objective. Their current command-line default is
+`strict`; use `--mode penalized` for overload or violation-first scoring.
+
+They can run without installing GreyJack. Their models and execution paths are
+separate from the original GreyJack examples above.

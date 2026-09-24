@@ -2,12 +2,17 @@
 
 import numpy as np
 import traceback
-from datetime import datetime
+from datetime import timedelta
 from greyjack.persistence.CotwinBuilderBase import CotwinBuilderBase
 from greyjack.variables.GJInteger import GJInteger
-from examples.object_oriented.food_packaging.cotwin import *
+from examples.object_oriented.food_packaging.cotwin import CotJob, CotLine, CotProduct, Cotwin
 from examples.object_oriented.food_packaging.score.IncrementalScoreCalculator import IncrementalScoreCalculator
 from examples.object_oriented.food_packaging.score.PlainScoreCalculator import PlainScoreCalculator
+
+
+def _wall_clock_minute(value):
+    """Keep the full naive business datetime independent of host timezone."""
+    return value.toordinal() * 24 * 60 + value.hour * 60 + value.minute
 
 
 class CotwinBuilder(CotwinBuilderBase):
@@ -38,7 +43,7 @@ class CotwinBuilder(CotwinBuilderBase):
 
             cotwin.set_score_calculator( score_calculator )
 
-        except Exception as e:
+        except Exception:
             print(traceback.format_exc())
 
 
@@ -54,10 +59,10 @@ class CotwinBuilder(CotwinBuilderBase):
         priorities = []
         for job in planning_jobs:
             product_ids.append(job.product_id)
-            durations.append(job.duration.seconds // 60)
-            min_start_times.append(int(datetime.combine(job.min_start_time, datetime.min.time()).timestamp() // 60))
-            ideal_end_times.append(int(datetime.combine(job.ideal_end_time, datetime.min.time()).timestamp() // 60))
-            max_end_times.append(int(datetime.combine(job.max_end_time, datetime.min.time()).timestamp() // 60))
+            durations.append(job.duration // timedelta(minutes=1))
+            min_start_times.append(_wall_clock_minute(job.min_start_time))
+            ideal_end_times.append(_wall_clock_minute(job.ideal_end_time))
+            max_end_times.append(_wall_clock_minute(job.max_end_time))
             priorities.append(job.priority)
         score_calculator.utility_objects["product_ids"] = product_ids
         score_calculator.utility_objects["durations"] = durations
@@ -72,7 +77,7 @@ class CotwinBuilder(CotwinBuilderBase):
         start_date_times = []
         for line in domain.lines:
             operators.append(operators_to_int_map[line.operator])
-            start_date_times.append(int(datetime.combine(line.start_date_time, datetime.min.time()).timestamp() // 60))
+            start_date_times.append(_wall_clock_minute(line.start_date_time))
         score_calculator.utility_objects["operators"] = operators
         score_calculator.utility_objects["start_date_times"] = start_date_times
         score_calculator.utility_objects["m_lines"] = len(start_date_times)
@@ -83,7 +88,7 @@ class CotwinBuilder(CotwinBuilderBase):
             for j in range(k_products):
                 product_i = domain.products[i]
                 product_j = domain.products[j]
-                cleaning_duration_matrix[i][j] = product_i.cleaning_durations[product_j].seconds // 60
+                cleaning_duration_matrix[i][j] = product_i.cleaning_durations[product_j] // timedelta(minutes=1)
         score_calculator.utility_objects["cleaning_duration_matrix"] = cleaning_duration_matrix
 
         pass
@@ -142,6 +147,4 @@ class CotwinBuilder(CotwinBuilderBase):
         for i in range(len(entities_list)):
             for field_name in redundant_fields:
                 delattr(entities_list[i], field_name)
-
-
 

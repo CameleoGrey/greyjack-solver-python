@@ -23,19 +23,13 @@ if __name__ == "__main__":
     # OptaPlanner/VRPLIB datasets and corresponding achieved results
     # Paths are relative to ${workspaceFolder}
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    data_dir_path = Path(project_dir_path, "data", "vrp", "data", "import")
-    # 1-depot datasets (plain CVRP)
-    #file_path = Path(data_dir_path, "vrpweb", "basic", "air", "A-n32-k5.vrp")
-    #file_path = Path(data_dir_path, "vrpweb", "basic", "air", "F-n135-k7.vrp")
-    #file_path = Path(data_dir_path, "usa", "basic", "air", "usa-n100-k10.vrp")
-    #file_path = Path(data_dir_path, "belgium", "basic", "air", "belgium-n50-k10.vrp")
-    #file_path = Path(data_dir_path, "belgium", "basic", "air", "belgium-n500-k20.vrp")
+    data_dir_path = Path(project_dir_path, "data", "vehiclerouting")
     #file_path = Path(data_dir_path, data_dir_path, "belgium", "basic", "air", "belgium-n1000-k40.vrp") #optimum: ~57.7; first_fit: ~195.3; RoutingModel: from 67.3 to 74 (depends on time)
     # multi-depot with timewindows
-    #file_path = Path(data_dir_path, "belgium", "multidepot-timewindowed", "air", "belgium-tw-d2-n50-k10.vrp") # optimum: ~15.98; first_fit: ~27.89
-    file_path = Path(data_dir_path, "belgium", "multidepot-timewindowed", "air", "belgium-tw-d5-n500-k20.vrp") # optimum: ~43.3; first_fit: ~124.884
-    #file_path = Path(data_dir_path, "belgium", "multidepot-timewindowed", "air", "belgium-tw-d8-n1000-k40.vrp") # optimum: ~58.1; first_fit: ~154.565
-    #file_path = Path(data_dir_path, "belgium", "multidepot-timewindowed", "air", "belgium-tw-d10-n2750-k55.vrp") # optimum: ~111; first_fit: ~380.9
+    #file_path = Path(data_dir_path, "belgium-tw-d2-n50-k10.vrp") # optimum: ~15.98; first_fit: ~27.89
+    file_path = Path(data_dir_path, "belgium-tw-d5-n500-k20.vrp") # optimum: ~43.3; first_fit: ~124.884
+    #file_path = Path(data_dir_path, "belgium-tw-d8-n1000-k40.vrp") # optimum: ~58.1; first_fit: ~154.565
+    #file_path = Path(data_dir_path, "belgium-tw-d10-n2750-k55.vrp") # optimum: ~111; first_fit: ~380.9
 
     domain_builder = DomainBuilder(file_path)
     cotwin_builder = CotwinBuilder(use_incremental_score_calculator=True, use_greed_init=True)
@@ -46,13 +40,13 @@ if __name__ == "__main__":
     #termination_strategy = ScoreLimit(score_to_compare=[0])
     agent = TabuSearch(neighbours_count=128, tabu_entity_rate=0.8, 
                        mutation_rate_multiplier=None, move_probas=[0.5, 0.5, 0.0, 0.0, 0.0, 0.0],
-                       migration_frequency=10, compare_to_global_frequency=1, termination_strategy=termination_strategy)
+                       migration_frequency=1, compare_to_global_frequency=10, termination_strategy=termination_strategy)
     """agent = GeneticAlgorithm(population_size=128, crossover_probability=0.5, p_best_rate=0.05,
                              tabu_entity_rate=0.8, mutation_rate_multiplier=None, move_probas=[0.5, 0.5, 0.0, 0.0, 0.0, 0.0],
                              migration_rate=0.00001, migration_frequency=10, termination_strategy=termination_strategy)"""
-    """agent = LateAcceptance(late_acceptance_size=32, tabu_entity_rate=0.8, 
+    """agent = LateAcceptance(late_acceptance_size=64, tabu_entity_rate=0.8, 
                            mutation_rate_multiplier=None, move_probas=[0.5, 0.5, 0.0, 0.0, 0.0, 0.0], 
-                           migration_frequency=10, compare_to_global_frequency=1000, termination_strategy=termination_strategy)"""
+                           migration_frequency=99999, compare_to_global_frequency=200, termination_strategy=termination_strategy)"""
     """agent = SimulatedAnnealing(initial_temperature=[1.0, 1.0, 1.0], cooling_rate=0.9999, tabu_entity_rate=0.8, 
                                mutation_rate_multiplier=None, move_probas=[0.5, 0.5, 0.0, 0.0, 0.0, 0.0], 
                                migration_frequency=10, compare_to_global_frequency=1000, termination_strategy=termination_strategy)"""
@@ -65,7 +59,7 @@ if __name__ == "__main__":
     domain = domain_builder.build_from_solution(solution)
     domain.print_metrics()
     domain.print_paths()
-    #domain.plot_paths()
+    domain.plot_paths()
 
 
     """
