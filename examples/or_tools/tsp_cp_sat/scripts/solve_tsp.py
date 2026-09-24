@@ -1,4 +1,4 @@
-"""TSP file -> business domain -> CP-SAT MTZ cotwin -> reconstructed tour."""
+"""TSP file -> business domain -> CP-SAT cotwin -> reconstructed tour."""
 
 import argparse
 import sys
@@ -9,18 +9,18 @@ PROJECT_ROOT = Path(__file__).resolve().parents[4]
 DATA_DIR = PROJECT_ROOT / "data" / "tsp"
 
 # Checked-in datasets. Change DEFAULT_INPUT here or pass --input on the CLI.
-#DEFAULT_INPUT = DATA_DIR / "dj38.tsp"
-#DEFAULT_INPUT = DATA_DIR / "belgium-n50.tsp"
-#DEFAULT_INPUT = DATA_DIR / "st70.tsp"
+# DEFAULT_INPUT = DATA_DIR / "dj38.tsp"
+# DEFAULT_INPUT = DATA_DIR / "belgium-n50.tsp"
+# DEFAULT_INPUT = DATA_DIR / "st70.tsp"
 DEFAULT_INPUT = DATA_DIR / "belgium-n100.tsp"
 #DEFAULT_INPUT = DATA_DIR / "pcb442.tsp"
-#DEFAULT_INPUT = DATA_DIR / "belgium-n500.tsp"
-#DEFAULT_INPUT = DATA_DIR / "lu980.tsp"
-#DEFAULT_INPUT = DATA_DIR / "belgium-n1000.tsp"
-#DEFAULT_INPUT = DATA_DIR / "belgium-n2750.tsp"
-#DEFAULT_INPUT = DATA_DIR / "gr9882.tsp"
-#DEFAULT_INPUT = DATA_DIR / "ch71009.tsp"
-#DEFAULT_INPUT = DATA_DIR / "usa115475.tsp"
+# DEFAULT_INPUT = DATA_DIR / "belgium-n500.tsp"
+# DEFAULT_INPUT = DATA_DIR / "lu980.tsp"
+# DEFAULT_INPUT = DATA_DIR / "belgium-n1000.tsp"
+# DEFAULT_INPUT = DATA_DIR / "belgium-n2750.tsp"
+# DEFAULT_INPUT = DATA_DIR / "gr9882.tsp"
+# DEFAULT_INPUT = DATA_DIR / "ch71009.tsp"
+# DEFAULT_INPUT = DATA_DIR / "usa115475.tsp"
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -32,14 +32,14 @@ def main(argv: list[str] | None = None) -> int:
         "--input",
         type=Path,
         default=DEFAULT_INPUT,
-        help="TSP input file (default: data/tsp/belgium-n50.tsp)",
+        help="TSP input file (default: data/tsp/belgium-n100.tsp)",
     )
     parser.add_argument("--workers", type=int, default=10, help="CP-SAT workers")
     parser.add_argument(
         "--no-improvement-seconds",
         type=float,
         default=30,
-        help="Stop after this many seconds without a better tour (default: 15)",
+        help="Stop after this many seconds without a better tour (default: 30)",
     )
     parser.add_argument(
         "--time-limit", type=float, help="Optional total search time limit in seconds"
@@ -48,6 +48,12 @@ def main(argv: list[str] | None = None) -> int:
         "--no-greedy-hints",
         action="store_true",
         help="Disable the complete nearest-neighbor route hint",
+    )
+    parser.add_argument(
+        "--formulation",
+        choices=("mtz", "circuit"),
+        default="circuit",
+        help="Route formulation: mtz (default) or circuit",
     )
     parser.add_argument(
         "--plot", action="store_true", help="Show the tour plot (requires matplotlib)"
@@ -67,10 +73,14 @@ def main(argv: list[str] | None = None) -> int:
         )
         builder = DomainBuilder(args.input)
         domain = builder.build_domain_from_scratch()
-        print(f"Building MTZ model: {len(domain.locations_list) - 1} stops", flush=True)
-        cotwin = CotwinBuilder(use_greedy_hints=not args.no_greedy_hints).build_cotwin(
-            domain
+        print(
+            f"Building {args.formulation.upper()} model: "
+            f"{len(domain.locations_list) - 1} stops",
+            flush=True,
         )
+        cotwin = CotwinBuilder(
+            use_greedy_hints=not args.no_greedy_hints, formulation=args.formulation
+        ).build_cotwin(domain)
         print(f"Solving with {args.workers} workers...", flush=True)
         solution = solver.solve(cotwin)
         print(f"Solver status: {solution.status}")

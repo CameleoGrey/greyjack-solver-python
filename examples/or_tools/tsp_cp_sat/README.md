@@ -1,4 +1,4 @@
-# Traveling salesperson with CP-SAT and MTZ
+# Traveling salesperson with CP-SAT
 
 This standalone example reimplements the object-oriented TSP example with
 OR-Tools CP-SAT. It follows the business domain -> cotwin -> solver ->
@@ -14,11 +14,13 @@ python -m pip install -r examples/or_tools/tsp_cp_sat/requirements.txt
 python -m examples.or_tools.tsp_cp_sat.scripts.solve_tsp
 ```
 
-The default input is `data/tsp/belgium-n50.tsp`. Pass `--input PATH` for another
+The default input is `data/tsp/belgium-n100.tsp`. Pass `--input PATH` for another
 TSP file. Direct script execution also works from any working directory. The
-CLI accepts `--workers` (default 10), `--no-improvement-seconds` (default 15),
-an optional total `--time-limit`, `--no-greedy-hints`, and `--plot`. Plotting
-needs matplotlib separately; `--help` works without OR-Tools installed. The
+CLI accepts `--workers` (default 10), `--no-improvement-seconds` (default 30),
+an optional total `--time-limit`, `--no-greedy-hints`, `--plot`, and
+`--formulation {mtz,circuit}` (default `mtz`). Use the same input and solver
+options with each formulation to compare them. Plotting needs matplotlib
+separately; `--help` works without OR-Tools installed. The
 examples environment can run it:
 
 ```bash
@@ -34,8 +36,9 @@ uv run --project examples --no-sync \
 - `persistence` parses the TSP file, creates the model, and rebuilds a copy of
   the domain from a solution. Original location IDs are preserved; dense indices
   exist only inside the cotwin.
-- `cotwin` stores the CP-SAT model, directed arcs, MTZ order variables, and the
-  distance objective. `solver` returns status, ordered stop IDs, and distance.
+- `cotwin` stores the CP-SAT model, directed arcs, and the distance objective.
+  Its order-variable map is empty in circuit mode. `solver` returns status,
+  ordered stop IDs, and distance.
 
 ```python
 from pathlib import Path
@@ -46,7 +49,7 @@ from examples.or_tools.tsp_cp_sat.solver.TSPSolver import TSPSolver
 
 builder = DomainBuilder(Path("data/tsp/belgium-n50.tsp"))
 domain = builder.build_domain_from_scratch()
-cotwin = CotwinBuilder().build_cotwin(domain)
+cotwin = CotwinBuilder(formulation="circuit").build_cotwin(domain)
 solution = TSPSolver(workers=10, no_improvement_seconds=15).solve(cotwin)
 if solution.has_solution:
     solved = builder.build_from_solution(solution, initial_domain=domain)
@@ -54,10 +57,12 @@ if solution.has_solution:
 ```
 
 The first listed location is the depot. Every other location is visited exactly
-once, then the tour returns to the depot. Each location has exactly one incoming
-and one outgoing selected arc. MTZ order increases along selected arcs between
-non-depot locations, so disconnected customer cycles are impossible. Exact
-coverage makes the source example's duplicate-stop hard penalty zero.
+once, then the tour returns to the depot. The default MTZ formulation enforces
+one incoming and outgoing arc per location and increases order on selected arcs
+between non-depot locations. The alternative `add_circuit()` formulation uses
+one circuit with all locations required. Both exclude disconnected customer
+cycles. Exact coverage makes the source example's duplicate-stop hard penalty
+zero.
 
 `EUC_2D` distances match the source solver matrix:
 `round(1000 * sqrt((lat1 - lat2)^2 + (lon1 - lon2)^2))`. The reported integer
@@ -78,9 +83,10 @@ incumbent returns no tour and does not prove infeasibility.
 `UNKNOWN`, `INFEASIBLE`, and `MODEL_INVALID` return no tour. The CLI exits 1
 when there is no incumbent and 2 for invalid input or options.
 
-The arc model grows quadratically with the number of locations. The CLI accepts
-large TSP files but they can require substantial time and memory. It checks
-CP-SAT integer bounds before solving.
+Both formulations have quadratically many arc variables. Circuit mode omits MTZ
+order variables and arc-conditioned order constraints, but is not guaranteed to
+solve faster. Large TSP files can require substantial time and memory. The
+builder checks CP-SAT integer bounds before solving.
 
 Run tests from the repository root:
 

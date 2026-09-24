@@ -24,8 +24,8 @@ def domain(capacity: int = 5) -> VehicleRoutingPlan:
 
 
 class StrictModeTests(unittest.TestCase):
-    def solve(self, problem: VehicleRoutingPlan, mode: str):
-        cotwin = CotwinBuilder(mode=mode).build_cotwin(problem)
+    def solve(self, problem: VehicleRoutingPlan, mode: str, formulation: str = "mtz"):
+        cotwin = CotwinBuilder(mode=mode, formulation=formulation).build_cotwin(problem)
         with redirect_stdout(io.StringIO()):
             return VRPSolver(workers=1, no_improvement_seconds=2, time_limit=5).solve(
                 cotwin
@@ -33,29 +33,41 @@ class StrictModeTests(unittest.TestCase):
 
     def test_strict_minimizes_distance_over_capacity_and_time_feasible_routes(self):
         problem = domain()
-        result = self.solve(problem, "strict")
-        self.assertEqual(result.status, "OPTIMAL")
-        self.assertEqual((result.hard_penalty, result.medium_penalty, result.distance),
-                         (0, 0, 12))
-        self.assertEqual(result.routes, ((7, 9),))
-        solved = DomainBuilder("unused").build_from_solution(result, problem)
-        self.assertEqual(solved.calculate_metrics()["distance"], 12)
-        self.assertFalse(problem.vehicles[0].customer_list)
+        for formulation in ("mtz", "circuit"):
+            with self.subTest(formulation=formulation):
+                result = self.solve(problem, "strict", formulation)
+                self.assertEqual(result.status, "OPTIMAL")
+                self.assertEqual(
+                    (result.hard_penalty, result.medium_penalty, result.distance),
+                    (0, 0, 12),
+                )
+                self.assertEqual(result.routes, ((7, 9),))
+                solved = DomainBuilder("unused").build_from_solution(result, problem)
+                self.assertEqual(solved.calculate_metrics()["distance"], 12)
+                self.assertFalse(problem.vehicles[0].customer_list)
 
     def test_strict_rejects_unavoidable_overload(self):
         problem = domain(capacity=4)
-        self.assertEqual(self.solve(problem, "penalized").hard_penalty, 1)
-        strict = self.solve(problem, "strict")
-        self.assertEqual(strict.status, "INFEASIBLE")
-        self.assertFalse(strict.has_solution)
+        for formulation in ("mtz", "circuit"):
+            with self.subTest(formulation=formulation):
+                self.assertEqual(
+                    self.solve(problem, "penalized", formulation).hard_penalty, 1
+                )
+                strict = self.solve(problem, "strict", formulation)
+                self.assertEqual(strict.status, "INFEASIBLE")
+                self.assertFalse(strict.has_solution)
 
     def test_strict_rejects_unavoidable_customer_lateness(self):
         problem = domain()
         problem.locations[1] = Customer(7, "A", 0, 1, 2, 0, 1, 2)
-        self.assertGreater(self.solve(problem, "penalized").medium_penalty, 0)
-        strict = self.solve(problem, "strict")
-        self.assertEqual(strict.status, "INFEASIBLE")
-        self.assertFalse(strict.has_solution)
+        for formulation in ("mtz", "circuit"):
+            with self.subTest(formulation=formulation):
+                self.assertGreater(
+                    self.solve(problem, "penalized", formulation).medium_penalty, 0
+                )
+                strict = self.solve(problem, "strict", formulation)
+                self.assertEqual(strict.status, "INFEASIBLE")
+                self.assertFalse(strict.has_solution)
 
     def test_strict_omits_unused_weight_overflow(self):
         problem = VehicleRoutingPlan(

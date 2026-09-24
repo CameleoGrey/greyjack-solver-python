@@ -1,17 +1,17 @@
-# Vehicle routing with CP-SAT and MTZ
+# Vehicle routing with CP-SAT
 
 This standalone example solves the object-oriented VRP example with OR-Tools
 CP-SAT. It keeps the business domain -> cotwin -> solver -> reconstructed
 business routes -> independent metrics flow. The original GreyJack example and
 the standalone OR-Tools `RoutingModel` example remain available.
 
-Pass `--mode strict` to enforce vehicle capacities, customer service-completion
-windows, and vehicle workday ends, then minimize only route distance. The
-default `--mode penalized` retains overload/lateness/distance scoring. Both
-modes require every customer exactly once and use the existing service-only
-clock. Strict mode returns no routes if no feasible incumbent is found; a
-timeout is not proof of infeasibility. The Python API uses
-`CotwinBuilder(mode="strict")`.
+The CLI defaults to `--mode strict`, which enforces vehicle capacities,
+customer service-completion windows, and vehicle workday ends, then minimizes
+route distance. `--mode penalized` retains overload/lateness/distance scoring.
+The Python API defaults to `CotwinBuilder(mode="penalized")`; pass
+`mode="strict"` for the CLI behavior. Both modes require every customer exactly
+once and use the existing service-only clock. Strict mode returns no routes if
+no feasible incumbent is found; a timeout is not proof of infeasibility.
 
 ## Install and run
 
@@ -22,7 +22,7 @@ python -m pip install -r examples/or_tools/vrp_cp_sat/requirements.txt
 python -m examples.or_tools.vrp_cp_sat.scripts.solve_vrp
 ```
 
-The checked-in `data/vehiclerouting/belgium-tw-d5-n500-k20.vrp` dataset is the
+The checked-in `data/vehiclerouting/belgium-tw-d2-n50-k10.vrp` dataset is the
 default. Use `--input PATH` for another file in the same `EUC_2D` VRP format.
 Direct script execution works from any working directory. The broader examples
 environment can also run it:
@@ -34,8 +34,11 @@ uv run --project examples --no-sync \
 ```
 
 Options are `--workers` (default 10), `--no-improvement-seconds` (default 180),
-`--time-limit` (optional total solver limit), `--no-greedy-hints`, `--plot`, and
-`--mode {penalized,strict}`.
+`--time-limit` (optional total solver limit), `--no-greedy-hints`, `--plot`,
+`--mode {penalized,strict}` (CLI default `strict`), and
+`--formulation {mtz,circuit}` (default `mtz`). To compare formulations on the
+same input, run once with `--formulation mtz` and once with
+`--formulation circuit`, keeping the other options fixed.
 Plotting needs matplotlib installed separately. `--help` works before installing
 OR-Tools. The parser accepts the checked-in `NODE_COORD_SECTION`,
 `DEMAND_SECTION`, and `DEPOT_SECTION` layout. It rejects unsupported edge-weight
@@ -47,8 +50,8 @@ formats and malformed data.
   route metrics from customer IDs and the input distance matrix without OR-Tools.
 - `persistence` reads the VRP file, constructs the CP-SAT cotwin, and rebuilds a
   copy of the business domain from solver routes.
-- `cotwin` stores the CP-SAT model, arcs, MTZ order variables, score components,
-  and location mappings.
+- `cotwin` stores the CP-SAT model, arcs, score components, and location
+  mappings. Its order-variable map is empty in circuit mode.
 - `solver` reports status, ordered routes, and score components. A callback
   prints and flushes each strictly improving `(hard, medium, distance)` tuple.
 
@@ -61,7 +64,7 @@ from examples.or_tools.vrp_cp_sat.solver.VRPSolver import VRPSolver
 
 builder = DomainBuilder(Path("data/vehiclerouting/belgium-tw-d2-n50-k10.vrp"))
 domain = builder.build_domain_from_scratch()
-cotwin = CotwinBuilder().build_cotwin(domain)
+cotwin = CotwinBuilder(formulation="circuit").build_cotwin(domain)
 solution = VRPSolver(workers=10, no_improvement_seconds=15).solve(cotwin)
 if solution.has_solution:
     solved = builder.build_from_solution(solution, initial_domain=domain)
@@ -69,11 +72,14 @@ if solution.has_solution:
 ```
 
 Every delivery customer appears exactly once. A vehicle uses one route from its
-own depot back to the same depot, or remains unused. Customer-to-customer arcs
-increase a shared MTZ order variable, excluding disconnected subtours. Actual
-customer IDs are retained in the domain and result; dense indices stay inside
-the cotwin. The reconstruction independently replays the routes and checks all
-three score components against the solver. It never modifies the input domain.
+own depot back to the same depot, or remains unused. The default MTZ formulation
+increases a shared order variable on selected customer-to-customer arcs. The
+alternative `add_circuit()` formulation uses one circuit per vehicle, with
+self-loops for unused vehicles and customers assigned to other vehicles. Both
+exclude disconnected subtours. Actual customer IDs are retained in the domain
+and result; dense indices stay inside the cotwin. The reconstruction
+independently replays the routes and checks all three score components against
+the solver. It never modifies the input domain.
 
 ## Score semantics
 
@@ -105,11 +111,12 @@ strictly better score. A watchdog also stops searches that produce no callback.
 `UNKNOWN`, `INFEASIBLE`, and `MODEL_INVALID` carry no routes; the CLI exits with
 code 1 when no incumbent is returned and code 2 for invalid input or options.
 
-MTZ creates customer-pair arc variables for each vehicle, so model size grows
-roughly with vehicles times customers squared. The 50-location dataset is a
-practical quick-run choice; the current 500-location default may require
-substantial time and memory. Unsafe CP-SAT integer bounds are rejected before
-search.
+Both formulations create customer-pair arc variables for each vehicle, so model
+size grows roughly with vehicles times customers squared. Circuit mode omits MTZ
+order variables and arc-conditioned order constraints; neither formulation is
+guaranteed to solve faster. The default 50-location dataset is a practical
+quick-run choice; the 500-location dataset may require substantial time and
+memory. Unsafe CP-SAT integer bounds are rejected before search.
 
 Run the standalone tests from the repository root:
 

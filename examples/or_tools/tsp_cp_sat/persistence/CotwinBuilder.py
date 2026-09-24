@@ -13,8 +13,11 @@ class _ModelFacts:
 
 
 class CotwinBuilder:
-    def __init__(self, use_greedy_hints: bool = True):
+    def __init__(self, use_greedy_hints: bool = True, *, formulation: str = "mtz"):
+        if formulation not in ("mtz", "circuit"):
+            raise ValueError("formulation must be 'mtz' or 'circuit'")
         self.use_greedy_hints = use_greedy_hints
+        self.formulation = formulation
 
     def build_cotwin(self, domain: TravelSchedule) -> CotTSP:
         domain.validate()
@@ -44,9 +47,8 @@ class CotwinBuilder:
             raise ValueError("Dataset exceeds safe CP-SAT integer bounds")
         return _ModelFacts(location_ids, distance_bound)
 
-    @staticmethod
     def _add_route_variables(
-        model: cp_model.CpModel, location_count: int
+        self, model: cp_model.CpModel, location_count: int
     ) -> tuple[dict[tuple[int, int], cp_model.IntVar], dict[int, cp_model.IntVar]]:
         arcs = {
             (source, target): model.new_bool_var(f"arc_{source}_{target}")
@@ -54,19 +56,28 @@ class CotwinBuilder:
             for target in range(location_count)
             if source != target
         }
-        order = {
-            index: model.new_int_var(1, location_count - 1, f"order_{index}")
-            for index in range(1, location_count)
-        }
+        order = (
+            {
+                index: model.new_int_var(1, location_count - 1, f"order_{index}")
+                for index in range(1, location_count)
+            }
+            if self.formulation == "mtz"
+            else {}
+        )
         return arcs, order
 
-    @staticmethod
     def _add_route_constraints(
+        self,
         model: cp_model.CpModel,
         arcs: dict[tuple[int, int], cp_model.IntVar],
         order: dict[int, cp_model.IntVar],
         location_count: int,
     ) -> None:
+        if self.formulation == "circuit":
+            model.add_circuit(
+                [(source, target, arc) for (source, target), arc in arcs.items()]
+            )
+            return
         for index in range(location_count):
             model.add_exactly_one(
                 arcs[index, target]
@@ -122,7 +133,8 @@ class CotwinBuilder:
         for edge, variable in cotwin.arcs.items():
             cotwin.model.add_hint(variable, int(edge in selected_arcs))
         for position, index in enumerate(route[1:-1], 1):
-            cotwin.model.add_hint(cotwin.order[index], position)
+            if index in cotwin.order:
+                cotwin.model.add_hint(cotwin.order[index], position)
         cotwin.model.add_hint(
             cotwin.distance,
             sum(matrix[source][target] for source, target in selected_arcs),

@@ -36,11 +36,20 @@ class _ModelState:
 
 
 class CotwinBuilder:
-    def __init__(self, use_greedy_hints: bool = True, *, mode: str = "penalized"):
+    def __init__(
+        self,
+        use_greedy_hints: bool = True,
+        *,
+        mode: str = "penalized",
+        formulation: str = "mtz",
+    ):
         if mode not in ("penalized", "strict"):
             raise ValueError("mode must be 'penalized' or 'strict'")
+        if formulation not in ("mtz", "circuit"):
+            raise ValueError("formulation must be 'mtz' or 'circuit'")
         self.use_greedy_hints = use_greedy_hints
         self.mode = mode
+        self.formulation = formulation
 
     def build_cotwin(self, domain: VehicleRoutingPlan) -> CotVRP:
         domain.validate()
@@ -151,14 +160,14 @@ class CotwinBuilder:
             hard_weight,
         )
 
-    @staticmethod
-    def _add_route_variables(state: _ModelState, facts: _ModelFacts) -> None:
+    def _add_route_variables(self, state: _ModelState, facts: _ModelFacts) -> None:
         model = state.model
         customer_count = len(facts.customers)
-        state.order = {
-            index: model.new_int_var(1, customer_count, f"order_{index}")
-            for index in facts.customers
-        }
+        if self.formulation == "mtz":
+            state.order = {
+                index: model.new_int_var(1, customer_count, f"order_{index}")
+                for index in facts.customers
+            }
         for vehicle_index, depot in enumerate(facts.depots):
             state.used[vehicle_index] = model.new_bool_var(f"used_{vehicle_index}")
             for customer in facts.customers:
@@ -177,8 +186,7 @@ class CotwinBuilder:
                             f"arc_{vehicle_index}_{customer}_{other}"
                         )
 
-    @staticmethod
-    def _add_route_constraints(state: _ModelState, facts: _ModelFacts) -> None:
+    def _add_route_constraints(self, state: _ModelState, facts: _ModelFacts) -> None:
         model = state.model
         arcs, assigned, used, order = (
             state.arcs,
@@ -191,6 +199,33 @@ class CotwinBuilder:
             model.add_exactly_one(
                 assigned[v, customer] for v in range(facts.vehicle_count)
             )
+        if self.formulation == "circuit":
+            # Each vehicle has its own depot at node 0; other depot indices are
+            # deliberately omitted from this dense, vehicle-local graph.
+            nodes = {customer: index for index, customer in enumerate(customers, 1)}
+            for vehicle_index, depot in enumerate(facts.depots):
+                circuit = [(0, 0, used[vehicle_index].Not())]
+                for customer in customers:
+                    node = nodes[customer]
+                    # The depot self-loop alone does not prevent a separate
+                    # customer cycle when this vehicle is marked unused.
+                    model.add_implication(
+                        assigned[vehicle_index, customer], used[vehicle_index]
+                    )
+                    circuit.extend(
+                        (
+                            (node, node, assigned[vehicle_index, customer].Not()),
+                            (0, node, arcs[vehicle_index, depot, customer]),
+                            (node, 0, arcs[vehicle_index, customer, depot]),
+                        )
+                    )
+                    circuit.extend(
+                        (node, nodes[other], arcs[vehicle_index, customer, other])
+                        for other in customers
+                        if other != customer
+                    )
+                model.add_circuit(circuit)
+            return
         for vehicle_index, depot in enumerate(facts.depots):
             model.add(
                 sum(arcs[vehicle_index, depot, i] for i in customers)

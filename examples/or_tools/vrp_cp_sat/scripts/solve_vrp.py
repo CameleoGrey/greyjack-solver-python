@@ -1,4 +1,4 @@
-"""VRP file -> business domain -> CP-SAT MTZ cotwin -> reconstructed routes."""
+"""VRP file -> business domain -> CP-SAT cotwin -> reconstructed routes."""
 
 import argparse
 import sys
@@ -20,7 +20,7 @@ def main(argv: list[str] | None = None) -> int:
         "--input",
         type=Path,
         default=DEFAULT_INPUT,
-        help="EUC_2D VRP file (default: checked-in 500-location dataset)",
+        help="EUC_2D VRP file (default: checked-in 50-location dataset)",
     )
     parser.add_argument("--workers", type=int, default=10, help="CP-SAT workers")
     parser.add_argument(
@@ -41,8 +41,16 @@ def main(argv: list[str] | None = None) -> int:
         "--plot", action="store_true", help="Show route plot (requires matplotlib)"
     )
     parser.add_argument(
-        "--mode", choices=("penalized", "strict"), default="strict",
-        help="Business constraints: penalized (default) or strict",
+        "--mode",
+        choices=("penalized", "strict"),
+        default="strict",
+        help="Business constraints: penalized or strict (default)",
+    )
+    parser.add_argument(
+        "--formulation",
+        choices=("mtz", "circuit"),
+        default="circuit",
+        help="Route formulation: mtz (default) or circuit",
     )
     args = parser.parse_args(argv)
 
@@ -60,12 +68,15 @@ def main(argv: list[str] | None = None) -> int:
         builder = DomainBuilder(args.input)
         domain = builder.build_domain_from_scratch()
         print(
-            f"Building MTZ model: {len(domain.customer_ids)} customers, "
+            f"Building {args.formulation.upper()} model: "
+            f"{len(domain.customer_ids)} customers, "
             f"{len(domain.vehicles)} vehicles, {len(domain.depot_ids)} depots",
             flush=True,
         )
         cotwin = CotwinBuilder(
-            use_greedy_hints=not args.no_greedy_hints, mode=args.mode
+            use_greedy_hints=not args.no_greedy_hints,
+            mode=args.mode,
+            formulation=args.formulation,
         ).build_cotwin(domain)
         print(f"Mode: {args.mode}", flush=True)
         print(f"Solving with {args.workers} workers...", flush=True)

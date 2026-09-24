@@ -70,25 +70,50 @@ def best_by_enumeration(domain: VehicleRoutingPlan) -> tuple[int, int, int]:
 
 
 class VRPTests(unittest.TestCase):
-    def test_mtz_and_scores_match_exhaustive_multi_depot_search(self):
+    def test_formulations_and_scores_match_exhaustive_multi_depot_search(self):
         domain = small_domain()
         expected = best_by_enumeration(domain)
-        cotwin = CotwinBuilder().build_cotwin(domain)
-        solution = VRPSolver(workers=1, time_limit=10).solve(cotwin)
-        self.assertEqual(solution.status, "OPTIMAL")
-        self.assertEqual(
-            (solution.hard_penalty, solution.medium_penalty, solution.distance),
-            expected,
-        )
-        solved = DomainBuilder("unused").build_from_solution(solution, domain)
-        self.assertEqual(sum(len(v.customer_list) for v in solved.vehicles), 3)
-        self.assertTrue(all(not v.customer_list for v in domain.vehicles))
-        self.assertEqual(
-            {stop.id for vehicle in solved.vehicles for stop in vehicle.customer_list},
-            {7, 9, 11},
-        )
+        for formulation in ("mtz", "circuit"):
+            for hints in (False, True):
+                with self.subTest(formulation=formulation, hints=hints):
+                    cotwin = CotwinBuilder(
+                        use_greedy_hints=hints, formulation=formulation
+                    ).build_cotwin(domain)
+                    self.assertEqual(bool(cotwin.order), formulation == "mtz")
+                    self.assertEqual(
+                        sum(
+                            constraint.has_circuit()
+                            for constraint in cotwin.model.proto.constraints
+                        ),
+                        len(domain.vehicles) if formulation == "circuit" else 0,
+                    )
+                    solution = VRPSolver(workers=1, time_limit=10).solve(cotwin)
+                    self.assertEqual(solution.status, "OPTIMAL")
+                    self.assertEqual(
+                        (
+                            solution.hard_penalty,
+                            solution.medium_penalty,
+                            solution.distance,
+                        ),
+                        expected,
+                    )
+                    solved = DomainBuilder("unused").build_from_solution(
+                        solution, domain
+                    )
+                    self.assertEqual(
+                        sum(len(v.customer_list) for v in solved.vehicles), 3
+                    )
+                    self.assertTrue(all(not v.customer_list for v in domain.vehicles))
+                    self.assertEqual(
+                        {
+                            stop.id
+                            for vehicle in solved.vehicles
+                            for stop in vehicle.customer_list
+                        },
+                        {7, 9, 11},
+                    )
 
-    def test_mtz_excludes_disconnected_customer_cycle(self):
+    def test_formulations_exclude_disconnected_customer_cycle(self):
         locations = [Customer(100, "D", 0.0, 0.0, 0)] + [
             Customer(i, str(i), 0.0, float(i), 0) for i in (1, 2, 3)
         ]
@@ -98,12 +123,16 @@ class VRPTests(unittest.TestCase):
         domain = VehicleRoutingPlan(
             "cycle", locations, [100], [Vehicle(100, 1)], matrix, False
         )
-        solution = VRPSolver(workers=1, time_limit=5).solve(
-            CotwinBuilder(use_greedy_hints=False).build_cotwin(domain)
-        )
-        self.assertEqual(solution.status, "OPTIMAL")
-        self.assertEqual(solution.distance, 200)
-        self.assertEqual(set(solution.routes[0]), {1, 2, 3})
+        for formulation in ("mtz", "circuit"):
+            with self.subTest(formulation=formulation):
+                solution = VRPSolver(workers=1, time_limit=5).solve(
+                    CotwinBuilder(
+                        use_greedy_hints=False, formulation=formulation
+                    ).build_cotwin(domain)
+                )
+                self.assertEqual(solution.status, "OPTIMAL")
+                self.assertEqual(solution.distance, 200)
+                self.assertEqual(set(solution.routes[0]), {1, 2, 3})
 
     def test_overload_and_time_replay_ignore_travel_duration(self):
         domain = VehicleRoutingPlan(
@@ -125,11 +154,15 @@ class VRPTests(unittest.TestCase):
             (2, 1, 30000),
         )
         domain.vehicles[0].customer_list = []
-        solution = VRPSolver(workers=1, time_limit=5).solve(
-            CotwinBuilder().build_cotwin(domain)
-        )
-        self.assertEqual((solution.hard_penalty, solution.medium_penalty), (2, 1))
-        DomainBuilder("unused").build_from_solution(solution, domain)
+        for formulation in ("mtz", "circuit"):
+            with self.subTest(formulation=formulation):
+                solution = VRPSolver(workers=1, time_limit=5).solve(
+                    CotwinBuilder(formulation=formulation).build_cotwin(domain)
+                )
+                self.assertEqual(
+                    (solution.hard_penalty, solution.medium_penalty), (2, 1)
+                )
+                DomainBuilder("unused").build_from_solution(solution, domain)
 
     def test_non_windowed_customer_can_leave_a_vehicle_unused(self):
         domain = VehicleRoutingPlan(
@@ -140,15 +173,21 @@ class VRPTests(unittest.TestCase):
             [[0, 4], [7, 0]],
             False,
         )
-        solution = VRPSolver(workers=1, time_limit=5).solve(
-            CotwinBuilder().build_cotwin(domain)
-        )
-        self.assertEqual(solution.status, "OPTIMAL")
-        self.assertEqual(
-            (solution.hard_penalty, solution.medium_penalty, solution.distance),
-            (0, 0, 11),
-        )
-        self.assertEqual(sum(bool(route) for route in solution.routes), 1)
+        for formulation in ("mtz", "circuit"):
+            with self.subTest(formulation=formulation):
+                solution = VRPSolver(workers=1, time_limit=5).solve(
+                    CotwinBuilder(formulation=formulation).build_cotwin(domain)
+                )
+                self.assertEqual(solution.status, "OPTIMAL")
+                self.assertEqual(
+                    (
+                        solution.hard_penalty,
+                        solution.medium_penalty,
+                        solution.distance,
+                    ),
+                    (0, 0, 11),
+                )
+                self.assertEqual(sum(bool(route) for route in solution.routes), 1)
 
     def test_reconstruction_rejects_incomplete_or_inconsistent_routes(self):
         domain = small_domain()
@@ -186,26 +225,37 @@ class VRPTests(unittest.TestCase):
                 "DEPOT_SECTION\n100\n-1\nEOF\n",
                 encoding="utf-8",
             )
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    "-m",
-                    "examples.or_tools.vrp_cp_sat.scripts.solve_vrp",
-                    "--input",
-                    str(path),
-                    "--workers",
-                    "1",
-                    "--time-limit",
-                    "5",
-                ],
-                cwd=ROOT,
-                text=True,
-                capture_output=True,
-                check=False,
-            )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("Unique stops (excluding depots): 2", result.stdout)
-            self.assertIn("Capacity overload: 0", result.stdout)
+            for formulation in (None, "mtz", "circuit"):
+                with self.subTest(formulation=formulation):
+                    result = subprocess.run(
+                        [
+                            sys.executable,
+                            "-m",
+                            "examples.or_tools.vrp_cp_sat.scripts.solve_vrp",
+                            "--input",
+                            str(path),
+                            "--workers",
+                            "1",
+                            "--time-limit",
+                            "5",
+                            *(["--formulation", formulation] if formulation else []),
+                        ],
+                        cwd=ROOT,
+                        text=True,
+                        capture_output=True,
+                        check=False,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn(
+                        f"Building {(formulation or 'mtz').upper()} model:",
+                        result.stdout,
+                    )
+                    self.assertIn("Unique stops (excluding depots): 2", result.stdout)
+                    self.assertIn("Capacity overload: 0", result.stdout)
+
+    def test_invalid_formulation(self):
+        with self.assertRaisesRegex(ValueError, "formulation"):
+            CotwinBuilder(formulation="unknown")
 
     def test_invalid_edge_type_and_integer_bounds(self):
         with tempfile.TemporaryDirectory() as temporary:

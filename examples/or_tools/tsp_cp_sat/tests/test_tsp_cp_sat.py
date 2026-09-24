@@ -60,29 +60,61 @@ class TSPTests(unittest.TestCase):
     def test_optimum_matches_exhaustive_directed_tours_and_replay(self):
         domain = small_domain()
         expected = best_distance_by_enumeration(domain)
-        solution = TSPSolver(workers=1, time_limit=5).solve(
-            CotwinBuilder().build_cotwin(domain)
-        )
-        self.assertEqual(solution.status, "OPTIMAL")
-        self.assertEqual(solution.distance, expected)
-        self.assertEqual(set(solution.tour_ids), {7, 9, 11})
-        solved = DomainBuilder("unused").build_from_solution(solution, domain)
-        self.assertEqual(solved.calculate_metrics()["distance"], expected)
-        self.assertIsNone(domain.vehicle.trip_path)
-        self.assertEqual(
-            solved.vehicle.trip_path[0], solved.location_by_id[solution.tour_ids[0]]
-        )
+        for formulation in ("mtz", "circuit"):
+            for hints in (False, True):
+                with self.subTest(formulation=formulation, hints=hints):
+                    cotwin = CotwinBuilder(
+                        use_greedy_hints=hints, formulation=formulation
+                    ).build_cotwin(domain)
+                    self.assertEqual(bool(cotwin.order), formulation == "mtz")
+                    self.assertEqual(
+                        sum(
+                            constraint.has_circuit()
+                            for constraint in cotwin.model.proto.constraints
+                        ),
+                        1 if formulation == "circuit" else 0,
+                    )
+                    solution = TSPSolver(workers=1, time_limit=5).solve(cotwin)
+                    self.assertEqual(solution.status, "OPTIMAL")
+                    self.assertEqual(solution.distance, expected)
+                    self.assertEqual(set(solution.tour_ids), {7, 9, 11})
+                    solved = DomainBuilder("unused").build_from_solution(
+                        solution, domain
+                    )
+                    self.assertEqual(solved.calculate_metrics()["distance"], expected)
+                    self.assertIsNone(domain.vehicle.trip_path)
+                    self.assertEqual(
+                        solved.vehicle.trip_path[0],
+                        solved.location_by_id[solution.tour_ids[0]],
+                    )
 
-    def test_mtz_excludes_disconnected_customer_cycle(self):
+    def test_formulations_exclude_disconnected_customer_cycle(self):
         matrix = [[0, 100, 100, 100]] + [
             [100, *[0 for _ in range(3)]] for _ in range(3)
         ]
-        solution = TSPSolver(workers=1, time_limit=5).solve(
-            CotwinBuilder(use_greedy_hints=False).build_cotwin(small_domain(matrix))
-        )
-        self.assertEqual(solution.status, "OPTIMAL")
-        self.assertEqual(solution.distance, 200)
-        self.assertEqual(set(solution.tour_ids), {7, 9, 11})
+        for formulation in ("mtz", "circuit"):
+            with self.subTest(formulation=formulation):
+                solution = TSPSolver(workers=1, time_limit=5).solve(
+                    CotwinBuilder(
+                        use_greedy_hints=False, formulation=formulation
+                    ).build_cotwin(small_domain(matrix))
+                )
+                self.assertEqual(solution.status, "OPTIMAL")
+                self.assertEqual(solution.distance, 200)
+                self.assertEqual(set(solution.tour_ids), {7, 9, 11})
+
+    def test_two_location_tour_in_both_formulations(self):
+        domain = small_domain()
+        domain.locations_list = domain.locations_list[:2]
+        domain.distance_matrix = [row[:2] for row in domain.distance_matrix[:2]]
+        for formulation in ("mtz", "circuit"):
+            with self.subTest(formulation=formulation):
+                solution = TSPSolver(workers=1, time_limit=5).solve(
+                    CotwinBuilder(formulation=formulation).build_cotwin(domain)
+                )
+                self.assertEqual(solution.status, "OPTIMAL")
+                self.assertEqual(solution.tour_ids, (7,))
+                self.assertEqual(solution.distance, 10)
 
     def test_real_input_preserves_ids_names_and_source_distance_rule(self):
         domain = DomainBuilder(DATASET).build_domain_from_scratch()
@@ -123,48 +155,61 @@ class TSPTests(unittest.TestCase):
             self.assertEqual(solution.status, "OPTIMAL")
             self.assertEqual(solution.tour_ids, (7, 9))
             self.assertEqual(solution.distance, 825)
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    "-m",
-                    "examples.or_tools.tsp_cp_sat.scripts.solve_tsp",
-                    "--input",
-                    str(path),
-                    "--workers",
-                    "1",
-                    "--no-improvement-seconds",
-                    "1",
-                    "--time-limit",
-                    "5",
-                ],
-                cwd=ROOT,
-                text=True,
-                capture_output=True,
-                check=False,
-            )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            score_lines = re.findall(
-                r"New best solution #(\d+): distance=(\d+)", result.stdout
-            )
-            self.assertTrue(score_lines, result.stdout)
-            self.assertEqual(
-                [int(sequence) for sequence, _ in score_lines],
-                list(range(1, len(score_lines) + 1)),
-            )
-            distances = [int(distance) for _, distance in score_lines]
-            self.assertTrue(
-                all(
-                    previous > current
-                    for previous, current in zip(distances, distances[1:])
-                )
-            )
-            self.assertEqual(score_lines[-1][1], "825")
-            self.assertLess(
-                result.stdout.index("New best solution #1:"),
-                result.stdout.index("Solver status:"),
-            )
-            self.assertIn("Solution distance (matrix units): 825", result.stdout)
-            self.assertIn("Unique stops (excluding depot): 2", result.stdout)
+            for formulation in (None, "mtz", "circuit"):
+                with self.subTest(formulation=formulation):
+                    result = subprocess.run(
+                        [
+                            sys.executable,
+                            "-m",
+                            "examples.or_tools.tsp_cp_sat.scripts.solve_tsp",
+                            "--input",
+                            str(path),
+                            "--workers",
+                            "1",
+                            "--no-improvement-seconds",
+                            "1",
+                            "--time-limit",
+                            "5",
+                            *(["--formulation", formulation] if formulation else []),
+                        ],
+                        cwd=ROOT,
+                        text=True,
+                        capture_output=True,
+                        check=False,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn(
+                        f"Building {(formulation or 'mtz').upper()} model:",
+                        result.stdout,
+                    )
+                    score_lines = re.findall(
+                        r"New best solution #(\d+): distance=(\d+)", result.stdout
+                    )
+                    self.assertTrue(score_lines, result.stdout)
+                    self.assertEqual(
+                        [int(sequence) for sequence, _ in score_lines],
+                        list(range(1, len(score_lines) + 1)),
+                    )
+                    distances = [int(distance) for _, distance in score_lines]
+                    self.assertTrue(
+                        all(
+                            previous > current
+                            for previous, current in zip(distances, distances[1:])
+                        )
+                    )
+                    self.assertEqual(score_lines[-1][1], "825")
+                    self.assertLess(
+                        result.stdout.index("New best solution #1:"),
+                        result.stdout.index("Solver status:"),
+                    )
+                    self.assertIn(
+                        "Solution distance (matrix units): 825", result.stdout
+                    )
+                    self.assertIn("Unique stops (excluding depot): 2", result.stdout)
+
+    def test_invalid_formulation(self):
+        with self.assertRaisesRegex(ValueError, "formulation"):
+            CotwinBuilder(formulation="unknown")
 
     def test_reconstruction_rejects_invalid_or_mismatched_tours(self):
         domain = small_domain()
