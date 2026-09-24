@@ -6,6 +6,8 @@ from copy import deepcopy
 from dataclasses import replace
 from datetime import date
 
+from ortools.sat.python import cp_model
+
 from examples.or_tools.maintenance_scheduling.domain import (
     Crew,
     Job,
@@ -106,6 +108,39 @@ class MaintenanceSchedulingTests(unittest.TestCase):
         self.assertEqual(separated["tag_penalty"], 4_000)
         domain.jobs[1].crew_id = 99
         self.assertEqual(domain.calculate_metrics()["tag_penalty"], 0)
+
+    def test_model_components_match_business_scores_for_fixed_assignments(self) -> None:
+        cases = (
+            ((42, 0), (42, 1)),  # Overlapping jobs on one crew.
+            ((42, 0), (42, 4)),  # Separated jobs still incur the tag penalty.
+            ((42, 1), (99, 0)),  # Different crews; both ideal dates match.
+            ((42, 2), (42, 0)),  # Late end and separated jobs on one crew.
+        )
+        for assignments in cases:
+            with self.subTest(assignments=assignments):
+                original = tiny_schedule()
+                expected = deepcopy(original)
+                cotwin = CotwinBuilder(mode="penalized").build_cotwin(original)
+                for job, (crew_id, start_index) in zip(expected.jobs, assignments):
+                    job.crew_id = crew_id
+                    job.start_date_id = start_index
+                    cotwin.model.add(
+                        cotwin.crew_variables[job.job_id]
+                        == cotwin.crew_ids.index(crew_id)
+                    )
+                    cotwin.model.add(cotwin.start_variables[job.job_id] == start_index)
+
+                metrics = expected.calculate_metrics()
+                solver = cp_model.CpSolver()
+                self.assertEqual(solver.solve(cotwin.model), cp_model.OPTIMAL)
+                for name, variable in cotwin.penalty_components.items():
+                    self.assertEqual(solver.value(variable), metrics[name], name)
+                self.assertEqual(
+                    solver.value(cotwin.hard_penalty), metrics["hard_penalty"]
+                )
+                self.assertEqual(
+                    solver.value(cotwin.soft_penalty), metrics["soft_penalty"]
+                )
 
     def test_beyond_calendar_end_and_ideal_equality(self) -> None:
         domain = MaintenanceSchedule(

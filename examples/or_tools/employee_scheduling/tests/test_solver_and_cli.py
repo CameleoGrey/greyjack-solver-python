@@ -331,7 +331,7 @@ class CommandLineTests(unittest.TestCase):
             patch(f"{DOMAIN_BUILDER_MODULE}.DomainBuilder", return_value=builder),
             redirect_stdout(io.StringIO()) as output,
         ):
-            code = main(["--workers", "1", "--time-limit", "3"])
+            code = main(["--mode", "penalized", "--workers", "1", "--time-limit", "3"])
         self.assertEqual(code, 0)
         self.assertIn("Solver status: OPTIMAL", output.getvalue())
         self.assertIn("Hard penalty: 1", output.getvalue())

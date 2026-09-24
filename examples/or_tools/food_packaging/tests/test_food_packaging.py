@@ -311,6 +311,8 @@ class FoodPackagingTests(unittest.TestCase):
                 "2",
                 "--job-count",
                 "4",
+                "--mode",
+                "strict",
                 "--start-date",
                 "2026-09-28",
                 "--workers",

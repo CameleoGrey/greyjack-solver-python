@@ -1,10 +1,30 @@
+from dataclasses import dataclass
 from functools import reduce
 from math import gcd
+from typing import Callable
 
 from ortools.constraint_solver import pywrapcp
 
 from ..cotwin import CotVRP
 from ..domain import VehicleRoutingPlan
+
+
+@dataclass(frozen=True)
+class _RoutingFacts:
+    location_ids: tuple[int, ...]
+    customer_indices: frozenset[int]
+    starts: list[int]
+    matrix: tuple[tuple[int, ...], ...]
+    demands: tuple[int, ...]
+    vehicle_count: int
+    hard_bound: int
+    time_scale: int
+    service_times: tuple[int, ...]
+    time_bound: int
+    medium_weight: int
+    hard_weight: int
+    objective_bound: int
+    bounds: dict[str, int]
 
 
 class CotwinBuilder:
@@ -17,6 +37,32 @@ class CotwinBuilder:
 
     def build_cotwin(self, domain: VehicleRoutingPlan) -> CotVRP:
         domain.validate()
+        facts = self._checked_routing_facts(domain)
+        manager = pywrapcp.RoutingIndexManager(
+            len(facts.location_ids), facts.vehicle_count, facts.starts, facts.starts
+        )
+        routing = pywrapcp.RoutingModel(manager)
+        callbacks = [
+            self._add_distance_cost(routing, manager, facts),
+            self._add_load_dimension(routing, manager, domain, facts),
+        ]
+        if domain.time_windowed:
+            callbacks.append(self._add_time_dimension(routing, manager, domain, facts))
+
+        return CotVRP(
+            manager,
+            routing,
+            facts.location_ids,
+            facts.customer_indices,
+            facts.hard_weight,
+            facts.medium_weight,
+            facts.time_scale,
+            facts.objective_bound,
+            tuple(callbacks),
+            self.mode,
+        )
+
+    def _checked_routing_facts(self, domain: VehicleRoutingPlan) -> _RoutingFacts:
         location_ids = tuple(location.id for location in domain.locations)
         id_to_index = domain.index_by_id
         customer_indices = frozenset(
@@ -52,21 +98,27 @@ class CotwinBuilder:
                 ),
                 0,
             )
-            time_scale = reduce(
-                gcd,
-                (
-                    value
-                    for vehicle in domain.vehicles
-                    for value in (vehicle.work_day_start, vehicle.work_day_end)
-                ),
-                time_scale,
-            ) or 1
+            time_scale = (
+                reduce(
+                    gcd,
+                    (
+                        value
+                        for vehicle in domain.vehicles
+                        for value in (vehicle.work_day_start, vehicle.work_day_end)
+                    ),
+                    time_scale,
+                )
+                or 1
+            )
             service_times = tuple(
                 location.service_time // time_scale for location in domain.locations
             )
             time_bound = max(
                 [
-                    *(vehicle.work_day_start // time_scale for vehicle in domain.vehicles),
+                    *(
+                        vehicle.work_day_start // time_scale
+                        for vehicle in domain.vehicles
+                    ),
                     *(
                         domain.locations[index].time_window_start // time_scale
                         for index in customer_indices
@@ -74,7 +126,10 @@ class CotwinBuilder:
                 ]
             ) + sum(service_times[index] for index in customer_indices)
             medium_bound = sum(
-                max(0, time_bound - domain.locations[index].time_window_end // time_scale)
+                max(
+                    0,
+                    time_bound - domain.locations[index].time_window_end // time_scale,
+                )
                 for index in customer_indices
             ) + sum(
                 max(0, time_bound - vehicle.work_day_end // time_scale)
@@ -136,21 +191,50 @@ class CotwinBuilder:
                     "Dataset exceeds safe RoutingModel integer bounds: "
                     f"{name}={value} > {safe_bound}"
                 )
+        return _RoutingFacts(
+            location_ids,
+            customer_indices,
+            starts,
+            matrix,
+            demands,
+            vehicle_count,
+            hard_bound,
+            time_scale,
+            service_times,
+            time_bound,
+            medium_weight,
+            hard_weight,
+            objective_bound,
+            bounds,
+        )
 
-        manager = pywrapcp.RoutingIndexManager(len(location_ids), vehicle_count, starts, starts)
-        routing = pywrapcp.RoutingModel(manager)
-
+    @staticmethod
+    def _add_distance_cost(
+        routing: pywrapcp.RoutingModel,
+        manager: pywrapcp.RoutingIndexManager,
+        facts: _RoutingFacts,
+    ) -> Callable[[int, int], int]:
         def distance_callback(source: int, target: int) -> int:
             # An unused vehicle contributes no depot-to-depot business distance.
             if routing.IsStart(source) and routing.IsEnd(target):
                 return 0
-            return matrix[manager.IndexToNode(source)][manager.IndexToNode(target)]
+            return facts.matrix[manager.IndexToNode(source)][
+                manager.IndexToNode(target)
+            ]
 
         distance_index = routing.RegisterTransitCallback(distance_callback)
         routing.SetArcCostEvaluatorOfAllVehicles(distance_index)
+        return distance_callback
 
+    def _add_load_dimension(
+        self,
+        routing: pywrapcp.RoutingModel,
+        manager: pywrapcp.RoutingIndexManager,
+        domain: VehicleRoutingPlan,
+        facts: _RoutingFacts,
+    ) -> Callable[[int], int]:
         def demand_callback(index: int) -> int:
-            return demands[manager.IndexToNode(index)]
+            return facts.demands[manager.IndexToNode(index)]
 
         demand_index = routing.RegisterUnaryTransitCallback(demand_callback)
         if self.mode == "strict":
@@ -163,7 +247,7 @@ class CotwinBuilder:
             )
         else:
             load_added = routing.AddDimension(
-                demand_index, 0, hard_bound, True, "Load"
+                demand_index, 0, facts.hard_bound, True, "Load"
             )
         if not load_added:
             raise RuntimeError("Could not add the Load dimension")
@@ -171,71 +255,63 @@ class CotwinBuilder:
         if self.mode == "penalized":
             for vehicle_index, vehicle in enumerate(domain.vehicles):
                 load.SetCumulVarSoftUpperBound(
-                    routing.End(vehicle_index), vehicle.capacity, hard_weight
+                    routing.End(vehicle_index), vehicle.capacity, facts.hard_weight
                 )
+        return demand_callback
 
-        callbacks = [distance_callback, demand_callback]
-        if domain.time_windowed:
+    def _add_time_dimension(
+        self,
+        routing: pywrapcp.RoutingModel,
+        manager: pywrapcp.RoutingIndexManager,
+        domain: VehicleRoutingPlan,
+        facts: _RoutingFacts,
+    ) -> Callable[[int], int]:
+        def service_callback(index: int) -> int:
+            if routing.IsStart(index):
+                return 0
+            return facts.service_times[manager.IndexToNode(index)]
 
-            def service_callback(index: int) -> int:
-                if routing.IsStart(index):
-                    return 0
-                return service_times[manager.IndexToNode(index)]
-
-            service_index = routing.RegisterUnaryTransitCallback(service_callback)
-            time_capacity = (
-                bounds["time_capacity"] if self.mode == "strict" else time_bound
-            )
-            if not routing.AddDimension(
-                service_index, time_capacity, time_capacity, False, "Time"
-            ):
-                raise RuntimeError("Could not add the Time dimension")
-            time = routing.GetDimensionOrDie("Time")
-            for vehicle_index, vehicle in enumerate(domain.vehicles):
-                start = time.CumulVar(routing.Start(vehicle_index))
-                work_day_start = vehicle.work_day_start // time_scale
-                start.SetRange(work_day_start, work_day_start)
-                end = time.CumulVar(routing.End(vehicle_index))
-                if self.mode == "strict":
-                    end.SetMax(vehicle.work_day_end // time_scale)
-                else:
-                    time.SetCumulVarSoftUpperBound(
-                        routing.End(vehicle_index),
-                        vehicle.work_day_end // time_scale,
-                        medium_weight,
-                    )
-                routing.AddVariableMinimizedByFinalizer(end)
-            for customer_index in customer_indices:
-                customer = domain.locations[customer_index]
-                routing_index = manager.NodeToIndex(customer_index)
-                clock = time.CumulVar(routing_index)
-                window_start = customer.time_window_start // time_scale
-                latest_start = (
-                    customer.time_window_end - customer.service_time
-                ) // time_scale
-                if self.mode == "strict":
-                    if window_start > min(latest_start, time_capacity):
-                        routing.solver().Add(routing.solver().FalseConstraint())
-                    else:
-                        clock.SetRange(window_start, min(latest_start, time_capacity))
-                else:
-                    clock.SetMin(window_start)
-                    # Cumul is service start; the business penalty uses completion.
-                    time.SetCumulVarSoftUpperBound(
-                        routing_index, latest_start, medium_weight
-                    )
-                routing.AddVariableMinimizedByFinalizer(clock)
-            callbacks.append(service_callback)
-
-        return CotVRP(
-            manager,
-            routing,
-            location_ids,
-            customer_indices,
-            hard_weight,
-            medium_weight,
-            time_scale,
-            objective_bound,
-            tuple(callbacks),
-            self.mode,
+        service_index = routing.RegisterUnaryTransitCallback(service_callback)
+        time_capacity = (
+            facts.bounds["time_capacity"] if self.mode == "strict" else facts.time_bound
         )
+        if not routing.AddDimension(
+            service_index, time_capacity, time_capacity, False, "Time"
+        ):
+            raise RuntimeError("Could not add the Time dimension")
+        time = routing.GetDimensionOrDie("Time")
+        for vehicle_index, vehicle in enumerate(domain.vehicles):
+            start = time.CumulVar(routing.Start(vehicle_index))
+            work_day_start = vehicle.work_day_start // facts.time_scale
+            start.SetRange(work_day_start, work_day_start)
+            end = time.CumulVar(routing.End(vehicle_index))
+            if self.mode == "strict":
+                end.SetMax(vehicle.work_day_end // facts.time_scale)
+            else:
+                time.SetCumulVarSoftUpperBound(
+                    routing.End(vehicle_index),
+                    vehicle.work_day_end // facts.time_scale,
+                    facts.medium_weight,
+                )
+            routing.AddVariableMinimizedByFinalizer(end)
+        for customer_index in facts.customer_indices:
+            customer = domain.locations[customer_index]
+            routing_index = manager.NodeToIndex(customer_index)
+            clock = time.CumulVar(routing_index)
+            window_start = customer.time_window_start // facts.time_scale
+            latest_start = (
+                customer.time_window_end - customer.service_time
+            ) // facts.time_scale
+            if self.mode == "strict":
+                if window_start > min(latest_start, time_capacity):
+                    routing.solver().Add(routing.solver().FalseConstraint())
+                else:
+                    clock.SetRange(window_start, min(latest_start, time_capacity))
+            else:
+                clock.SetMin(window_start)
+                # Cumul is service start; the business penalty uses completion.
+                time.SetCumulVarSoftUpperBound(
+                    routing_index, latest_start, facts.medium_weight
+                )
+            routing.AddVariableMinimizedByFinalizer(clock)
+        return service_callback

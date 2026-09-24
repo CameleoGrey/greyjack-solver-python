@@ -13,6 +13,36 @@ class CotwinBuilder:
 
     def build_cotwin(self, domain: ScheduleCB) -> CotScheduleCB:
         domain.validate()
+        totals, cost_bound, hard_bound, hard_weight = self._checked_score_bounds(domain)
+        model = cp_model.CpModel()
+        assignments = self._add_assignments(model, domain)
+        used, overloads = self._add_resource_constraints(
+            model, domain, assignments, totals
+        )
+        hard_penalty, soft_cost = self._add_objective(
+            model, domain, used, overloads, cost_bound, hard_bound, hard_weight
+        )
+
+        cotwin = CotScheduleCB(
+            model,
+            assignments,
+            used,
+            overloads,
+            hard_penalty,
+            soft_cost,
+            hard_weight,
+            self.mode,
+        )
+        if self.use_greed_init:
+            self._add_greedy_hints(domain, cotwin)
+        validation_error = model.validate()
+        if validation_error:
+            raise ValueError(f"Invalid CP-SAT model: {validation_error}")
+        return cotwin
+
+    def _checked_score_bounds(
+        self, domain: ScheduleCB
+    ) -> tuple[tuple[int, ...], int, int, int]:
         totals = tuple(
             sum(p.requirements[r] for p in domain.processes) for r in range(3)
         )
@@ -27,8 +57,12 @@ class CotwinBuilder:
         values.extend(value for c in domain.computers for value in c.resources)
         if any(value > safe_bound for value in values):
             raise ValueError("Dataset exceeds safe CP-SAT integer bounds")
+        return totals, cost_bound, hard_bound, hard_weight
 
-        model = cp_model.CpModel()
+    @staticmethod
+    def _add_assignments(
+        model: cp_model.CpModel, domain: ScheduleCB
+    ) -> dict[int, dict[int, cp_model.IntVar]]:
         assignments = {}
         for process in domain.processes:
             row = {
@@ -39,7 +73,15 @@ class CotwinBuilder:
             }
             model.add_exactly_one(row.values())
             assignments[process.process_id] = row
+        return assignments
 
+    def _add_resource_constraints(
+        self,
+        model: cp_model.CpModel,
+        domain: ScheduleCB,
+        assignments: dict[int, dict[int, cp_model.IntVar]],
+        totals: tuple[int, ...],
+    ) -> tuple[dict[int, cp_model.IntVar], dict[int, tuple[cp_model.IntVar, ...]]]:
         used = {}
         overloads = {}
         for computer in domain.computers:
@@ -57,13 +99,25 @@ class CotwinBuilder:
                 )
                 if self.mode == "strict":
                     model.add(consumption <= capacity)
+                # Penalized mode records the same capacity violation as a hard score.
                 excess = model.new_int_var(
                     0, max(0, totals[r] - capacity), f"overload_{cid}_{r}"
                 )
                 model.add_max_equality(excess, [0, consumption - capacity])
                 excess_vars.append(excess)
             overloads[cid] = tuple(excess_vars)
+        return used, overloads
 
+    def _add_objective(
+        self,
+        model: cp_model.CpModel,
+        domain: ScheduleCB,
+        used: dict[int, cp_model.IntVar],
+        overloads: dict[int, tuple[cp_model.IntVar, ...]],
+        cost_bound: int,
+        hard_bound: int,
+        hard_weight: int,
+    ) -> tuple[cp_model.IntVar, cp_model.IntVar]:
         hard_penalty = model.new_int_var(0, hard_bound, "hard_penalty")
         soft_cost = model.new_int_var(0, cost_bound, "soft_cost")
         model.add(hard_penalty == sum(v for row in overloads.values() for v in row))
@@ -74,17 +128,9 @@ class CotwinBuilder:
             model.add(hard_penalty == 0)
             model.minimize(soft_cost)
         else:
+            # One overload point outweighs every possible change in running cost.
             model.minimize(hard_weight * hard_penalty + soft_cost)
-        cotwin = CotScheduleCB(
-            model, assignments, used, overloads, hard_penalty, soft_cost, hard_weight,
-            self.mode,
-        )
-        if self.use_greed_init:
-            self._add_greedy_hints(domain, cotwin)
-        validation_error = model.validate()
-        if validation_error:
-            raise ValueError(f"Invalid CP-SAT model: {validation_error}")
-        return cotwin
+        return hard_penalty, soft_cost
 
     @staticmethod
     def _add_greedy_hints(domain: ScheduleCB, cotwin: CotScheduleCB) -> None:

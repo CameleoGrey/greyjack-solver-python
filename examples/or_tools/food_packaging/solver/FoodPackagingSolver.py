@@ -67,6 +67,18 @@ class FoodPackagingSolver:
             monitor.close()
         return status, monitor
 
+    @staticmethod
+    def _build_refined_model(
+        cotwin: CotFoodPackaging, best_hard_penalty: int
+    ) -> cp_model.CpModel:
+        """Fix the proven hard score, then minimize medium before soft."""
+        refined = cotwin.model.clone()
+        refined.add(cotwin.hard_penalty == best_hard_penalty)
+        refined.minimize(
+            cotwin.medium_weight * cotwin.medium_penalty + cotwin.soft_penalty
+        )
+        return refined
+
     def solve(self, cotwin: CotFoodPackaging) -> FoodPackagingSolution:
         started = monotonic()
         status, monitor = self._run_phase(
@@ -92,11 +104,7 @@ class FoodPackagingSolver:
                 and not stopped_idle
                 and (remaining is None or remaining > 0)
             ):
-                refined = cotwin.model.clone()
-                refined.add(cotwin.hard_penalty == best_score[0])
-                refined.minimize(
-                    cotwin.medium_weight * cotwin.medium_penalty + cotwin.soft_penalty
-                )
+                refined = self._build_refined_model(cotwin, best_score[0])
                 status, monitor = self._run_phase(
                     cotwin,
                     refined,

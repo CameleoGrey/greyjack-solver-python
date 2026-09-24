@@ -1,3 +1,4 @@
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from itertools import combinations
 
@@ -11,6 +12,47 @@ def _minutes(delta: timedelta) -> int:
     return int(delta.total_seconds() // 60)
 
 
+@dataclass
+class _ModelFacts:
+    origin: datetime
+    line_start: dict[int, int]
+    duration: dict[int, int]
+    min_start: dict[int, int]
+    ideal_end: dict[int, int]
+    max_end: dict[int, int]
+    cleaning: dict[tuple[int, int], int]
+    horizon: int
+    hard_bound: int
+    medium_bound: int
+    ideal_bound: int
+    cleaning_bound: int
+    overlap_bound: int
+    soft_bound: int
+    medium_weight: int
+
+
+@dataclass
+class _ModelState:
+    model: cp_model.CpModel
+    start: dict[int, cp_model.IntVar] = field(default_factory=dict)
+    end: dict[int, cp_model.IntVar] = field(default_factory=dict)
+    late: dict[int, cp_model.IntVar] = field(default_factory=dict)
+    ideal_late: dict[int, cp_model.IntVar] = field(default_factory=dict)
+    assignment: dict[tuple[int, int], cp_model.IntVar] = field(default_factory=dict)
+    empty_line: dict[int, cp_model.IntVar] = field(default_factory=dict)
+    arcs: dict[tuple[int, int | None, int | None], cp_model.IntVar] = field(
+        default_factory=dict
+    )
+    line_spans: dict[int, cp_model.IntVar] = field(default_factory=dict)
+    span_squares: dict[int, cp_model.IntVar] = field(default_factory=dict)
+    clean_terms: list = field(default_factory=list)
+    operator_assignment: dict[tuple[int, int], cp_model.IntVar] = field(
+        default_factory=dict
+    )
+    overlap_hints: dict = field(default_factory=dict)
+    operator_overlap: cp_model.IntVar | None = None
+
+
 class CotwinBuilder:
     def __init__(self, *, mode: str = "strict", use_greedy_hints: bool = True):
         if mode not in ("strict", "penalized"):
@@ -20,6 +62,42 @@ class CotwinBuilder:
 
     def build_cotwin(self, domain: PackagingSchedule) -> CotFoodPackaging:
         domain.validate()
+        facts = self._checked_model_facts(domain)
+        state = _ModelState(cp_model.CpModel())
+        self._add_job_times(state, facts, domain)
+        self._add_line_assignments(state, domain)
+        self._add_line_circuits(state, facts, domain)
+        self._add_operator_rules(state, facts, domain)
+        hard, medium, ideal, clean_penalty, soft = self._add_objective(state, facts)
+
+        cotwin = CotFoodPackaging(
+            state.model,
+            facts.origin,
+            self.mode,
+            state.assignment,
+            state.empty_line,
+            state.arcs,
+            state.start,
+            state.end,
+            hard,
+            medium,
+            soft,
+            state.operator_overlap,
+            ideal,
+            clean_penalty,
+            facts.medium_weight,
+            facts.horizon,
+            tuple(job.id for job in domain.jobs),
+            tuple(line.id for line in domain.lines),
+        )
+        if self.use_greedy_hints:
+            self._add_greedy_hints(domain, cotwin, facts, state)
+        error = state.model.validate()
+        if error:
+            raise ValueError(f"Invalid CP-SAT model: {error}")
+        return cotwin
+
+    def _checked_model_facts(self, domain: PackagingSchedule) -> _ModelFacts:
         jobs = domain.jobs
         lines = domain.lines
         n = len(jobs)
@@ -88,110 +166,149 @@ class CotwinBuilder:
         ]
         if any(value > safe_bound for value in bounds):
             raise ValueError("Dataset exceeds safe CP-SAT integer bounds")
+        return _ModelFacts(
+            origin,
+            line_start,
+            duration,
+            min_start,
+            ideal_end,
+            max_end,
+            cleaning,
+            horizon,
+            hard_bound,
+            medium_bound,
+            ideal_bound,
+            cleaning_bound,
+            overlap_bound,
+            soft_bound,
+            medium_weight,
+        )
 
-        model = cp_model.CpModel()
-        start = {}
-        end = {}
-        late = {}
-        ideal_late = {}
-        for job in jobs:
+    def _add_job_times(
+        self, state: _ModelState, facts: _ModelFacts, domain: PackagingSchedule
+    ) -> None:
+        model = state.model
+        for job in domain.jobs:
             jid = job.id
-            start[jid] = model.new_int_var(0, horizon, f"start_{jid}")
-            end[jid] = model.new_int_var(0, horizon, f"end_{jid}")
-            model.add(end[jid] == start[jid] + duration[jid])
-            late[jid] = model.new_int_var(
-                0, max(0, horizon - max_end[jid]), f"late_{jid}"
+            state.start[jid] = model.new_int_var(0, facts.horizon, f"start_{jid}")
+            state.end[jid] = model.new_int_var(0, facts.horizon, f"end_{jid}")
+            model.add(state.end[jid] == state.start[jid] + facts.duration[jid])
+            state.late[jid] = model.new_int_var(
+                0, max(0, facts.horizon - facts.max_end[jid]), f"late_{jid}"
             )
-            model.add_max_equality(late[jid], [0, end[jid] - max_end[jid]])
-            ideal_late[jid] = model.new_int_var(
-                0, max(0, horizon - ideal_end[jid]), f"ideal_late_{jid}"
+            model.add_max_equality(
+                state.late[jid], [0, state.end[jid] - facts.max_end[jid]]
             )
-            model.add_max_equality(ideal_late[jid], [0, end[jid] - ideal_end[jid]])
+            state.ideal_late[jid] = model.new_int_var(
+                0, max(0, facts.horizon - facts.ideal_end[jid]), f"ideal_late_{jid}"
+            )
+            model.add_max_equality(
+                state.ideal_late[jid], [0, state.end[jid] - facts.ideal_end[jid]]
+            )
             if self.mode == "strict":
-                model.add(start[jid] >= min_start[jid])
-                model.add(end[jid] <= max_end[jid])
+                model.add(state.start[jid] >= facts.min_start[jid])
+                model.add(state.end[jid] <= facts.max_end[jid])
 
-        assignment = {
-            (job.id, line.id): model.new_bool_var(f"assign_{job.id}_{line.id}")
-            for job in jobs
-            for line in lines
+    @staticmethod
+    def _add_line_assignments(state: _ModelState, domain: PackagingSchedule) -> None:
+        state.assignment = {
+            (job.id, line.id): state.model.new_bool_var(f"assign_{job.id}_{line.id}")
+            for job in domain.jobs
+            for line in domain.lines
         }
-        for job in jobs:
-            model.add_exactly_one(assignment[job.id, line.id] for line in lines)
+        for job in domain.jobs:
+            state.model.add_exactly_one(
+                state.assignment[job.id, line.id] for line in domain.lines
+            )
 
-        empty_line = {}
-        arcs = {}
-        line_spans = {}
-        span_squares = {}
-        clean_terms = []
-        for line in lines:
+    @staticmethod
+    def _add_line_circuits(
+        state: _ModelState, facts: _ModelFacts, domain: PackagingSchedule
+    ) -> None:
+        model = state.model
+        jobs = domain.jobs
+        for line in domain.lines:
             lid = line.id
             empty = model.new_bool_var(f"empty_{lid}")
-            empty_line[lid] = empty
-            span = model.new_int_var(0, horizon, f"span_{lid}")
-            square = model.new_int_var(0, horizon * horizon, f"span_square_{lid}")
-            line_spans[lid] = span
-            span_squares[lid] = square
+            state.empty_line[lid] = empty
+            span = model.new_int_var(0, facts.horizon, f"span_{lid}")
+            square = model.new_int_var(
+                0, facts.horizon * facts.horizon, f"span_square_{lid}"
+            )
+            state.line_spans[lid] = span
+            state.span_squares[lid] = square
             model.add_multiplication_equality(square, [span, span])
             model.add(span == 0).only_enforce_if(empty)
             if not jobs:
                 model.add(empty == 1)
                 continue
 
+            # A circuit orders exactly the jobs assigned to this line.
             circuit = [(0, 0, empty)]
             for index, job in enumerate(jobs, start=1):
                 jid = job.id
-                circuit.append((index, index, assignment[jid, lid].Not()))
+                circuit.append((index, index, state.assignment[jid, lid].Not()))
                 first = model.new_bool_var(f"first_{lid}_{jid}")
                 last = model.new_bool_var(f"last_{lid}_{jid}")
-                arcs[lid, None, jid] = first
-                arcs[lid, jid, None] = last
+                state.arcs[lid, None, jid] = first
+                state.arcs[lid, jid, None] = last
                 circuit.extend(((0, index, first), (index, 0, last)))
-                model.add(start[jid] >= line_start[lid]).only_enforce_if(first)
-                model.add(span == end[jid] - line_start[lid]).only_enforce_if(last)
+                model.add(state.start[jid] >= facts.line_start[lid]).only_enforce_if(
+                    first
+                )
+                model.add(
+                    span == state.end[jid] - facts.line_start[lid]
+                ).only_enforce_if(last)
             for previous_index, previous in enumerate(jobs, start=1):
                 for incoming_index, incoming in enumerate(jobs, start=1):
                     if previous_index == incoming_index:
                         continue
                     edge = model.new_bool_var(f"next_{lid}_{previous.id}_{incoming.id}")
-                    arcs[lid, previous.id, incoming.id] = edge
+                    state.arcs[lid, previous.id, incoming.id] = edge
                     circuit.append((previous_index, incoming_index, edge))
                     model.add(
-                        start[incoming.id]
-                        >= end[previous.id] + cleaning[incoming.id, previous.id]
+                        state.start[incoming.id]
+                        >= state.end[previous.id]
+                        + facts.cleaning[incoming.id, previous.id]
                     ).only_enforce_if(edge)
-                    clean_terms.append(
-                        incoming.priority * cleaning[incoming.id, previous.id] * edge
+                    state.clean_terms.append(
+                        incoming.priority
+                        * facts.cleaning[incoming.id, previous.id]
+                        * edge
                     )
             model.add_circuit(circuit)
 
+    def _add_operator_rules(
+        self, state: _ModelState, facts: _ModelFacts, domain: PackagingSchedule
+    ) -> None:
+        model = state.model
+        jobs = domain.jobs
+        lines = domain.lines
         operator_ids = sorted({line.operator for line in lines})
-        operator_assignment = {}
         for job in jobs:
             for operator in operator_ids:
                 selected = model.new_bool_var(f"operator_{job.id}_{operator}")
                 relevant_lines = [
-                    assignment[job.id, line.id]
+                    state.assignment[job.id, line.id]
                     for line in lines
                     if line.operator == operator
                 ]
                 model.add_max_equality(selected, relevant_lines)
-                operator_assignment[job.id, operator] = selected
-        overlap_hints = {}
+                state.operator_assignment[job.id, operator] = selected
         if self.mode == "strict":
             for operator in operator_ids:
                 intervals = [
                     model.new_optional_interval_var(
-                        start[job.id],
-                        duration[job.id],
-                        end[job.id],
-                        operator_assignment[job.id, operator],
+                        state.start[job.id],
+                        facts.duration[job.id],
+                        state.end[job.id],
+                        state.operator_assignment[job.id, operator],
                         f"production_{job.id}_{operator}",
                     )
                     for job in jobs
                 ]
                 model.add_no_overlap(intervals)
-            operator_overlap = model.new_int_var(0, 0, "operator_overlap")
+            state.operator_overlap = model.new_int_var(0, 0, "operator_overlap")
         else:
             overlap_terms = []
             for left, right in combinations(jobs, 2):
@@ -199,114 +316,101 @@ class CotwinBuilder:
                 both = []
                 for operator in operator_ids:
                     shared = model.new_bool_var(f"both_{left.id}_{right.id}_{operator}")
-                    first = operator_assignment[left.id, operator]
-                    second = operator_assignment[right.id, operator]
+                    first = state.operator_assignment[left.id, operator]
+                    second = state.operator_assignment[right.id, operator]
                     model.add(shared <= first)
                     model.add(shared <= second)
                     model.add(shared >= first + second - 1)
                     both.append(shared)
-                    overlap_hints[pair, "both", operator] = shared
+                    state.overlap_hints[pair, "both", operator] = shared
                 same = model.new_bool_var(f"same_operator_{left.id}_{right.id}")
                 model.add(same == sum(both))
-                min_end = model.new_int_var(0, horizon, f"min_end_{left.id}_{right.id}")
-                max_start = model.new_int_var(
-                    0, horizon, f"max_start_{left.id}_{right.id}"
+                min_end = model.new_int_var(
+                    0, facts.horizon, f"min_end_{left.id}_{right.id}"
                 )
-                model.add_min_equality(min_end, [end[left.id], end[right.id]])
-                model.add_max_equality(max_start, [start[left.id], start[right.id]])
+                max_start = model.new_int_var(
+                    0, facts.horizon, f"max_start_{left.id}_{right.id}"
+                )
+                model.add_min_equality(
+                    min_end, [state.end[left.id], state.end[right.id]]
+                )
+                model.add_max_equality(
+                    max_start, [state.start[left.id], state.start[right.id]]
+                )
                 overlap = model.new_int_var(
                     0,
-                    min(duration[left.id], duration[right.id]),
+                    min(facts.duration[left.id], facts.duration[right.id]),
                     f"overlap_{left.id}_{right.id}",
                 )
                 model.add_max_equality(overlap, [0, min_end - max_start])
                 contribution = model.new_int_var(
                     0,
-                    min(duration[left.id], duration[right.id]),
+                    min(facts.duration[left.id], facts.duration[right.id]),
                     f"operator_overlap_{left.id}_{right.id}",
                 )
                 model.add(contribution == overlap).only_enforce_if(same)
                 model.add(contribution == 0).only_enforce_if(same.Not())
                 overlap_terms.append(contribution)
-                overlap_hints[pair] = (same, min_end, max_start, overlap, contribution)
-            operator_overlap = model.new_int_var(0, overlap_bound, "operator_overlap")
-            model.add(operator_overlap == sum(overlap_terms))
+                state.overlap_hints[pair] = (
+                    same,
+                    min_end,
+                    max_start,
+                    overlap,
+                    contribution,
+                )
+            state.operator_overlap = model.new_int_var(
+                0, facts.overlap_bound, "operator_overlap"
+            )
+            model.add(state.operator_overlap == sum(overlap_terms))
 
-        hard = model.new_int_var(0, hard_bound, "hard_penalty")
-        medium = model.new_int_var(0, medium_bound, "medium_penalty")
-        ideal = model.new_int_var(0, ideal_bound, "ideal_lateness")
-        clean_penalty = model.new_int_var(0, cleaning_bound, "cleaning_penalty")
-        soft = model.new_int_var(0, soft_bound, "soft_penalty")
-        model.add(hard == sum(late.values()))
-        model.add(medium == sum(span_squares.values()))
-        model.add(ideal == sum(ideal_late.values()))
-        model.add(clean_penalty == sum(clean_terms))
-        model.add(soft == ideal + clean_penalty + operator_overlap)
+    def _add_objective(
+        self, state: _ModelState, facts: _ModelFacts
+    ) -> tuple[
+        cp_model.IntVar,
+        cp_model.IntVar,
+        cp_model.IntVar,
+        cp_model.IntVar,
+        cp_model.IntVar,
+    ]:
+        model = state.model
+        hard = model.new_int_var(0, facts.hard_bound, "hard_penalty")
+        medium = model.new_int_var(0, facts.medium_bound, "medium_penalty")
+        ideal = model.new_int_var(0, facts.ideal_bound, "ideal_lateness")
+        clean_penalty = model.new_int_var(0, facts.cleaning_bound, "cleaning_penalty")
+        soft = model.new_int_var(0, facts.soft_bound, "soft_penalty")
+        model.add(hard == sum(state.late.values()))
+        model.add(medium == sum(state.span_squares.values()))
+        model.add(ideal == sum(state.ideal_late.values()))
+        model.add(clean_penalty == sum(state.clean_terms))
+        model.add(soft == ideal + clean_penalty + state.operator_overlap)
         if self.mode == "strict":
             model.add(hard == 0)
-            model.minimize(medium_weight * medium + soft)
+            model.minimize(facts.medium_weight * medium + soft)
         else:
+            # The solver fixes the proven minimum hard score before optimizing
+            # medium and soft penalties in its second phase.
             model.minimize(hard)
-
-        cotwin = CotFoodPackaging(
-            model,
-            origin,
-            self.mode,
-            assignment,
-            empty_line,
-            arcs,
-            start,
-            end,
-            hard,
-            medium,
-            soft,
-            operator_overlap,
-            ideal,
-            clean_penalty,
-            medium_weight,
-            horizon,
-            tuple(job.id for job in jobs),
-            tuple(line.id for line in lines),
-        )
-        if self.use_greedy_hints:
-            self._add_greedy_hints(
-                domain,
-                cotwin,
-                duration,
-                line_start,
-                min_start,
-                max_end,
-                ideal_end,
-                cleaning,
-                late,
-                ideal_late,
-                line_spans,
-                span_squares,
-                operator_assignment,
-                overlap_hints,
-            )
-        error = model.validate()
-        if error:
-            raise ValueError(f"Invalid CP-SAT model: {error}")
-        return cotwin
+        return hard, medium, ideal, clean_penalty, soft
 
     def _add_greedy_hints(
         self,
-        domain,
-        cotwin,
-        duration,
-        line_start,
-        min_start,
-        max_end,
-        ideal_end,
-        cleaning,
-        late,
-        ideal_late,
-        line_spans,
-        span_squares,
-        operator_assignment,
-        overlap_hints,
+        domain: PackagingSchedule,
+        cotwin: CotFoodPackaging,
+        facts: _ModelFacts,
+        state: _ModelState,
     ) -> None:
+        duration = facts.duration
+        line_start = facts.line_start
+        min_start = facts.min_start
+        max_end = facts.max_end
+        ideal_end = facts.ideal_end
+        cleaning = facts.cleaning
+        late = state.late
+        ideal_late = state.ideal_late
+        line_spans = state.line_spans
+        span_squares = state.span_squares
+        operator_assignment = state.operator_assignment
+        overlap_hints = state.overlap_hints
         lines = domain.lines
         jobs = domain.jobs
         routes = {line.id: [] for line in lines}
