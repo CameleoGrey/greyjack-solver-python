@@ -317,6 +317,7 @@ dependencies = [
     { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "pathos" },
     { name = "polars" },
+    { name = "protobuf" },
     { name = "pyarrow" },
     { name = "pyzmq" },
 ]
@@ -341,7 +342,8 @@ requires-dist = [
     { name = "numpy" },
     { name = "pathos" },
     { name = "polars", specifier = ">=1.44.2,<1.45" },
-    { name = "pyarrow" },
+    { name = "protobuf", specifier = ">=6.33.5" },
+    { name = "pyarrow", specifier = ">=23.0.1" },
     { name = "pyzmq" },
 ]
 

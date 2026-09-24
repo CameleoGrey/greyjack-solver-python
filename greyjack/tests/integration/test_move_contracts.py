@@ -510,6 +510,7 @@ def test_invalid_mutation_configuration_raises_value_error(algorithm, option, va
         {"upper": float("nan")},
         {"lower": float("-inf")},
         {"upper": float("inf")},
+        {"lower": -1e308, "upper": 1e308, "integer": False},
         {"lower": 21, "upper": 20},
         {"initial": -1},
         {"initial": 21},

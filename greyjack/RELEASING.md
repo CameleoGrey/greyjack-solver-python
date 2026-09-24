@@ -17,6 +17,13 @@ Rustup selects the repository's pinned Rust 1.98.1 toolchain.
   Rust Polars 0.55.2, pyo3-polars 0.28.0, and PyO3 0.29.2.
 - Move generation validates variable bounds and preserves frozen and fixed
   variables. Regression tests cover integer, floating-point, and mixed domains.
+- Default move selection filters out operators that cannot apply to a group's
+  size. Plain and incremental sampling share the same final assignments, including
+  overlapping edge swaps. Invalid or empty eligible portfolios raise an explicit
+  error; no disabled move is silently enabled.
+- Tabu selection and LSHADE donor selection are bounded even after search loses
+  diversity. Dependency minimums include the PyArrow 23.0.1, Protobuf 6.33.5,
+  rand 0.8.6, and array-init-cursor 0.2.1 fixes for reported security issues.
 - Agent failures reach callers as `RuntimeError`; normal stopping returns the
   best available solution or `None`, and Ctrl-C cleanup re-raises
   `KeyboardInterrupt`. Spawned workers require importable callbacks and a main

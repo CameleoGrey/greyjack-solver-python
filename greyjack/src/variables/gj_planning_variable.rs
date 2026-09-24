@@ -28,6 +28,9 @@ impl GJPlanningVariable {
         if self.lower_bound > self.upper_bound {
             return Err("Variable lower_bound must not exceed upper_bound".to_string());
         }
+        if self.is_changeable() && !(self.upper_bound - self.lower_bound).is_finite() {
+            return Err("Variable range must have finite width for random sampling".to_string());
+        }
         if self.is_int && (self.lower_bound.fract() != 0.0 || self.upper_bound.fract() != 0.0) {
             return Err("Integer variable bounds must be integral".to_string());
         }

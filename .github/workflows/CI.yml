@@ -93,7 +93,7 @@ jobs:
           manylinux: ${{ matrix.platform.manylinux }}
           args: >-
             --release --strip --locked --out dist
-            --compatibility ${{ matrix.platform.compatibility }}
+            ${{ matrix.platform.name != 'linux' && '--compatibility pypi' || '' }}
             -i ${{ matrix.platform.name == 'linux' && format('python{0}', matrix.python-version) || 'python' }}
             --manifest-path ./greyjack/Cargo.toml
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
