@@ -55,6 +55,7 @@ The independent OR-Tools examples have their own dependency files and run guides
 - [Employee scheduling](or_tools/employee_scheduling/README.md)
 - [Facility location](or_tools/facility_location/README.md)
 - [Facility location with Benders decomposition](or_tools/facility_location_benders/README.md)
+- [Facility location with Cross decomposition](or_tools/facility_location_cross/README.md)
 - [Food packaging](or_tools/food_packaging/README.md)
 - [Maintenance scheduling](or_tools/maintenance_scheduling/README.md)
 - [Maintenance scheduling with Benders decomposition](or_tools/maintenance_scheduling_benders/README.md)
