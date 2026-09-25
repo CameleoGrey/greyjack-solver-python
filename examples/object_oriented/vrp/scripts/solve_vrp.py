@@ -40,7 +40,7 @@ if __name__ == "__main__":
     #termination_strategy = ScoreLimit(score_to_compare=[0])
     agent = TabuSearch(neighbours_count=128, tabu_entity_rate=0.8, 
                        mutation_rate_multiplier=None, move_probas=[0.5, 0.5, 0.0, 0.0, 0.0, 0.0],
-                       migration_frequency=1, compare_to_global_frequency=10, termination_strategy=termination_strategy)
+                       migration_frequency=999999, compare_to_global_frequency=10, termination_strategy=termination_strategy)
     """agent = GeneticAlgorithm(population_size=128, crossover_probability=0.5, p_best_rate=0.05,
                              tabu_entity_rate=0.8, mutation_rate_multiplier=None, move_probas=[0.5, 0.5, 0.0, 0.0, 0.0, 0.0],
                              migration_rate=0.00001, migration_frequency=10, termination_strategy=termination_strategy)"""

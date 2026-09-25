@@ -355,7 +355,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "greyjack", specifier = ">=0.3.9" },
+    { name = "greyjack", editable = "../greyjack" },
     { name = "matplotlib", specifier = ">=3.11.2" },
     { name = "ortools", specifier = ">=9.15.6755" },
 ]
@@ -423,7 +423,7 @@ wheels = [
 [[package]]
 name = "greyjack"
 version = "0.3.9"
-source = { registry = "https://pypi.org/simple" }
+source = { editable = "../greyjack" }
 dependencies = [
     { name = "bitarray" },
     { name = "dill" },
@@ -441,17 +441,30 @@ dependencies = [
     { name = "pyarrow" },
     { name = "pyzmq" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6a/af/586f0ec87fd40b1d5d86065378439ce0406d5c5231233da08702c2a01b46/greyjack-0.3.9.tar.gz", hash = "sha256:4601328e2a3cc948894611bd319144cda6b47c142f762b78c917add66863c91c", size = 280754, upload-time = "2026-09-24T01:30:26.035Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b6/ea/3d829dca7eb60f41c7fd186ccf9579d9ead7f48c127bc49d01f17134554a/greyjack-0.3.9-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:b5b88f1a1fff88cd62d55bbe79de73f35fd8bae4090068ccd68936e93721e110", size = 17276605, upload-time = "2026-09-24T01:29:46.235Z" },
-    { url = "https://files.pythonhosted.org/packages/2a/74/4e0830553bb8817b61f84ab8f0858eda8d5654eb9756f588de1c9bce6872/greyjack-0.3.9-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:95e0512ab8a92718232a192130b8f189ad5b0e1050a0708ac42d3db800b65c3f", size = 19084784, upload-time = "2026-09-24T01:29:51.326Z" },
-    { url = "https://files.pythonhosted.org/packages/93/f0/66c49a09ed61904682f53bff800af77f5debf5031a5c6667c1a44cce236a/greyjack-0.3.9-cp312-cp312-win_amd64.whl", hash = "sha256:ee664aab0f9d65a823669ede803b9fa14b8e702034e166d1f25a6f246e8c1ff1", size = 20482337, upload-time = "2026-09-24T01:29:56.136Z" },
-    { url = "https://files.pythonhosted.org/packages/78/a1/9793d572d98054c102d782074cd36814d03b9cd8b6ea7131fbf2e0b74cdf/greyjack-0.3.9-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:790e38e819abee506349cfe0127d79844d553b4cd1d0045b3cc6aee4ec36ef80", size = 17275763, upload-time = "2026-09-24T01:30:00.328Z" },
-    { url = "https://files.pythonhosted.org/packages/6c/51/426e1aecb5de104754957e919c0871040d100706b8b9c16e42426c85267a/greyjack-0.3.9-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:d385a3c60bf6d57dec32931c073ec644976f89e026e1371b3a6e1a78bbb45749", size = 19083867, upload-time = "2026-09-24T01:30:04.798Z" },
-    { url = "https://files.pythonhosted.org/packages/72/19/23cd643a0adae4f2a796faa0707a0d80cdd1e1b75b743c47be97bac7541a/greyjack-0.3.9-cp313-cp313-win_amd64.whl", hash = "sha256:09f4805ca900f20ba2b756848ea7aa73d1537590526a623d4204a0cc0d91432e", size = 20477668, upload-time = "2026-09-24T01:30:09.169Z" },
-    { url = "https://files.pythonhosted.org/packages/bb/01/9779c30bda4cb3fcb167389c6e780c36309212af17927aaf4c4cc048d42c/greyjack-0.3.9-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:29ae71bec8d6eb472585387b8c717b240bc39598f26b81ddf6bd3e054b4ed8db", size = 17285567, upload-time = "2026-09-24T01:30:13.548Z" },
-    { url = "https://files.pythonhosted.org/packages/0a/5b/4a25fb575cbaa1716bece0bfa2de8ff29e3c1af1185dc9054467467f51e2/greyjack-0.3.9-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:7422ff195319c77c6fb7fad6838f8a3da780b9678f70cee84bff4ff3f484eb39", size = 19090299, upload-time = "2026-09-24T01:30:18.002Z" },
-    { url = "https://files.pythonhosted.org/packages/aa/67/51725e5e7bcead67371c60f26114d4b0e5021db39f116097ba8aec21ba62/greyjack-0.3.9-cp314-cp314-win_amd64.whl", hash = "sha256:747a487b3b85ef4cedf290e012982daea27b4fa716175be09769f241fd14eaf4", size = 20478731, upload-time = "2026-09-24T01:30:22.972Z" },
+
+[package.metadata]
+requires-dist = [
+    { name = "bitarray", specifier = ">=3.5.0" },
+    { name = "dill" },
+    { name = "maturin", specifier = ">=1.9.1" },
+    { name = "mmh3", specifier = ">=5.1.0" },
+    { name = "multiprocess" },
+    { name = "mypy" },
+    { name = "mypy-extensions" },
+    { name = "mypy-protobuf" },
+    { name = "numba", specifier = ">=0.60.0" },
+    { name = "numpy" },
+    { name = "pathos" },
+    { name = "polars", specifier = ">=1.44.2,<1.45" },
+    { name = "protobuf", specifier = ">=6.33.5" },
+    { name = "pyarrow", specifier = ">=23.0.1" },
+    { name = "pyzmq" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=8,<10" },
+    { name = "ruff", specifier = ">=0.11" },
 ]
 
 [[package]]

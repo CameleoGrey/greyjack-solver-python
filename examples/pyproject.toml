@@ -10,5 +10,8 @@ dependencies = [
     "ortools>=9.15.6755",
 ]
 
+[tool.uv.sources]
+greyjack = { path = "../greyjack", editable = true }
+
 [dependency-groups]
 dev = ["pytest>=8,<10"]
