@@ -51,6 +51,7 @@ The employee scheduling demo generates its data locally.
 The independent OR-Tools examples have their own dependency files and run guides:
 
 - [Cloud balancing](or_tools/cloud_balancing/README.md)
+- [Cloud balancing with Lagrangian relaxation](or_tools/cloud_balancing_lagrangian/README.md)
 - [Employee scheduling](or_tools/employee_scheduling/README.md)
 - [Facility location](or_tools/facility_location/README.md)
 - [Facility location with Benders decomposition](or_tools/facility_location_benders/README.md)
